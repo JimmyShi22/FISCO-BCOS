@@ -20,7 +20,7 @@
  * @date: 2019-1-8
  */
 
-#include "TxDAG.h"
+#include "TxCqDAG.h"
 #include "Common.h"
 #include <map>
 
@@ -30,7 +30,7 @@ using namespace dev::eth;
 using namespace dev::blockverifier;
 
 // Generate DAG according with given transactions
-void TxDAG::init(ExecutiveContext::Ptr _ctx, Transactions const& _txs)
+void TxCqDAG::init(ExecutiveContext::Ptr _ctx, Transactions const& _txs)
 {
     m_txs = make_shared<Transactions const>(_txs);
     m_dag.init(_txs.size());
@@ -74,12 +74,12 @@ void TxDAG::init(ExecutiveContext::Ptr _ctx, Transactions const& _txs)
 }
 
 // Set transaction execution function
-void TxDAG::setTxExecuteFunc(ExecuteTxFunc const& _f)
+void TxCqDAG::setTxExecuteFunc(ExecuteTxFunc const& _f)
 {
     f_executeTx = _f;
 }
 
-int TxDAG::executeUnit()
+int TxCqDAG::executeUnit()
 {
     // PARA_LOG(TRACE) << LOG_DESC("executeUnit") << LOG_KV("exeCnt", m_exeCnt)
     //              << LOG_KV("total", m_txs->size());
@@ -90,7 +90,96 @@ int TxDAG::executeUnit()
             return 0;
     }
 
+    // PARA_LOG(TRACE) << LOG_DESC("executeUnit transaction") << LOG_KV("txid", id);
+    // TODO catch execute exception
     int exeCnt = 0;
+    while (id != INVALID_ID)
+    {
+        f_executeTx((*m_txs)[id], id);
+
+        id = m_dag.consume(id);
+
+
+        Guard l(x_exeCnt);
+        m_exeCnt += 1;
+        exeCnt += 1;
+        // PARA_LOG(TRACE) << LOG_DESC("executeUnit finish") << LOG_KV("exeCnt", m_exeCnt)
+        //                << LOG_KV("total", m_txs->size());
+    }
+    return exeCnt;
+}
+
+void TxCqDAG::executeSerialTxs()
+{
+    for (ID id : serialTxs)
+    {
+        // TODO catch execute exception
+        f_executeTx((*m_txs)[id], id);
+    }
+}
+
+
+// Generate DAG according with given transactions
+void TxTbbCqDAG::init(ExecutiveContext::Ptr _ctx, Transactions const& _txs)
+{
+    m_txs = make_shared<Transactions const>(_txs);
+    m_dag.init(_txs.size());
+
+    CriticalField<string> latestCriticals;
+
+    for (ID id = 0; id < _txs.size(); id++)
+    {
+        auto& tx = _txs[id];
+
+        // Is para transaction? //XXX Serial transaction has all criticals it will seperate DAG
+        auto p = _ctx->getPrecompiled(tx.receiveAddress());
+        if (!p || !p->isDagPrecompiled())
+        {
+            continue;
+        }
+
+        // Get critical field
+        vector<string> criticals = p->getDagTag(ref(tx.data()));
+
+        // Add edge between critical transaction
+        for (string const& c : criticals)
+        {
+            ID pIds = latestCriticals.get(c);
+            if (pIds != INVALID_ID)
+            {
+                m_dag.addEdge(pIds, id);  // add DAG edge
+            }
+        }
+
+        for (string const& c : criticals)
+        {
+            latestCriticals.update(c, id);
+        }
+    }
+
+    // Generate DAG
+    m_dag.generate();
+
+    m_totalParaTxs = _txs.size() - serialTxs.size();
+}
+
+// Set transaction execution function
+void TxTbbCqDAG::setTxExecuteFunc(ExecuteTxFunc const& _f)
+{
+    f_executeTx = _f;
+}
+
+int TxTbbCqDAG::executeUnit()
+{
+    // PARA_LOG(TRACE) << LOG_DESC("executeUnit") << LOG_KV("exeCnt", m_exeCnt)
+    //              << LOG_KV("total", m_txs->size());
+    ID id;
+    {
+        id = m_dag.waitPop();
+        if (id == INVALID_ID)
+            return 0;
+    }
+
     // PARA_LOG(TRACE) << LOG_DESC("executeUnit transaction") << LOG_KV("txid", id);
     // TODO catch execute exception
     while (id != INVALID_ID)
@@ -99,16 +188,16 @@ int TxDAG::executeUnit()
 
         id = m_dag.consume(id);
 
-        exeCnt += 1;
+
         Guard l(x_exeCnt);
         m_exeCnt += 1;
         // PARA_LOG(TRACE) << LOG_DESC("executeUnit finish") << LOG_KV("exeCnt", m_exeCnt)
         //                << LOG_KV("total", m_txs->size());
     }
-    return exeCnt;
+    return 1;
 }
 
-void TxDAG::executeSerialTxs()
+void TxTbbCqDAG::executeSerialTxs()
 {
     for (ID id : serialTxs)
     {

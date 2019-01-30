@@ -67,6 +67,18 @@ public:
     virtual ~BlockVerifier() {}
 
     ExecutiveContext::Ptr executeBlock(dev::eth::Block& block, BlockInfo const& parentBlockInfo);
+    ExecutiveContext::Ptr queueExecuteBlock(
+        dev::eth::Block& block, BlockInfo const& parentBlockInfo);
+    ExecutiveContext::Ptr parallelExecuteBlock(
+        dev::eth::Block& block, BlockInfo const& parentBlockInfo);
+    ExecutiveContext::Ptr parallelCqExecuteBlock(
+        dev::eth::Block& block, BlockInfo const& parentBlockInfo);
+    ExecutiveContext::Ptr parallelTbbCqExecuteBlock(
+        dev::eth::Block& block, BlockInfo const& parentBlockInfo);
+    ExecutiveContext::Ptr parallelLevelExecuteBlock(
+        dev::eth::Block& block, BlockInfo const& parentBlockInfo);
+    ExecutiveContext::Ptr parallelOmpExecuteBlock(
+        dev::eth::Block& block, BlockInfo const& parentBlockInfo);
 
     std::pair<dev::executive::ExecutionResult, dev::eth::TransactionReceipt> executeTransaction(
         const dev::eth::BlockHeader& blockHeader, dev::eth::Transaction const& _t);

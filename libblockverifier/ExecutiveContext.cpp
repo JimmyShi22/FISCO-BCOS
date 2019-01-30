@@ -35,11 +35,12 @@ bytes ExecutiveContext::call(Address const& origin, Address address, bytesConstR
 {
     try
     {
+        /*
         EXECUTIVECONTEXT_LOG(TRACE)
             << LOG_DESC("[#call]PrecompiledEngine call") << LOG_KV("blockHash", m_blockInfo.hash)
             << LOG_KV("number", m_blockInfo.number) << LOG_KV("address", address)
             << LOG_KV("param", toHex(param));
-
+*/
         auto p = getPrecompiled(address);
 
         if (p)
@@ -77,20 +78,22 @@ Address ExecutiveContext::registerPrecompiled(Precompiled::Ptr p)
 bool ExecutiveContext::isPrecompiled(Address address) const
 {
     auto p = getPrecompiled(address);
-
-    if (p)
-    {
-        LOG(DEBUG) << LOG_DESC("[#isPrecompiled]Internal contract") << LOG_KV("address", address);
-    }
-
+    /*
+        if (p)
+        {
+            LOG(DEBUG) << LOG_DESC("[#isPrecompiled]Internal contract") << LOG_KV("address",
+       address);
+        }
+    */
     return p.get() != NULL;
 }
 
 Precompiled::Ptr ExecutiveContext::getPrecompiled(Address address) const
 {
+    /*
     LOG(TRACE) << LOG_DESC("[#getPrecompiled]")
                << LOG_KV("addressSize", m_address2Precompiled.size());
-
+*/
     auto itPrecompiled = m_address2Precompiled.find(address);
 
     if (itPrecompiled != m_address2Precompiled.end())

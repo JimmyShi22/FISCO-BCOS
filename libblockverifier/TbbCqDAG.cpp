@@ -20,36 +20,36 @@
  * @date: 2019-1-8
  */
 
-#include "DAG.h"
+#include "TbbCqDAG.h"
 
 using namespace std;
 using namespace dev;
 using namespace dev::blockverifier;
 
-DAG::~DAG()
+TbbCqDAG::~TbbCqDAG()
 {
     clear();
 }
 
-void DAG::init(ID _maxSize)
+void TbbCqDAG::init(ID _maxSize)
 {
     clear();
     for (ID i = 0; i < _maxSize; i++)
-        m_vtxs.emplace_back(make_shared<Vertex>());
+        m_vtxs.emplace_back(make_shared<TbbCqVertex>());
     m_totalVtxs = _maxSize;
 }
 
-void DAG::addEdge(ID _f, ID _t)
+void TbbCqDAG::addEdge(ID _f, ID _t)
 {
     if (_f >= m_vtxs.size() && _t >= m_vtxs.size())
         return;
     m_vtxs[_f]->outEdge.emplace_back(_t);
     m_vtxs[_t]->inDegree += 1;
-    // PARA_LOG(TRACE) << LOG_BADGE("DAG") << LOG_DESC("Add edge") << LOG_KV("from", _f)
+    // PARA_LOG(TRACE) << LOG_BADGE("TbbCqDAG") << LOG_DESC("Add edge") << LOG_KV("from", _f)
     //                << LOG_KV("to", _t);
 }
 
-void DAG::generate()
+void TbbCqDAG::generate()
 {
     for (ID id = 0; id < m_vtxs.size(); id++)
     {
@@ -57,24 +57,41 @@ void DAG::generate()
             m_topLevel.push(id);
     }
 
-    // PARA_LOG(TRACE) << LOG_BADGE("DAG") << LOG_DESC("generate")
+    // PARA_LOG(TRACE) << LOG_BADGE("TbbCqDAG") << LOG_DESC("generate")
     //                << LOG_KV("queueSize", m_topLevel.size());
     // for (ID id = 0; id < m_vtxs.size(); id++)
     // printVtx(id);
 }
 
-ID DAG::pop()
+ID TbbCqDAG::pop()
 {
+    /*
     Guard l(x_topLevel);
     if (m_topLevel.empty())
         return INVALID_ID;
 
-    ID top = std::move(m_topLevel.front());
+    ID top = m_topLevel.front();
     m_topLevel.pop();
     return top;
+    */
+    return 0;
 }
 
-ID DAG::waitPop()
+ID TbbCqDAG::waitPop()
+{
+    ID top;
+    auto ret = m_topLevel.try_pop(top);
+    if (ret)
+    {
+        return top;
+    }
+    else
+    {
+        return INVALID_ID;
+    }
+}
+/*
+ID TbbCqDAG::waitPop()
 {
     std::unique_lock<std::mutex> ul(x_topLevel);
     while (m_topLevel.empty())
@@ -85,66 +102,51 @@ ID DAG::waitPop()
             cv_topLevel.wait(ul);
     }
 
-    ID top = std::move(m_topLevel.front());
+    ID top = m_topLevel.front();
     m_topLevel.pop();
     return top;
 }
-
-ID DAG::consume(ID _id)
+*/
+ID TbbCqDAG::consume(ID _id)
 {
     ID producedNum = 0;
     ID nextId = INVALID_ID;
-    ID currentDegree = INVALID_ID;
     for (ID id : m_vtxs[_id]->outEdge)
     {
         auto vtx = m_vtxs[id];
         {
-            WriteGuard l(vtx->vtxLock);
             vtx->inDegree -= 1;
-            currentDegree = vtx->inDegree;
         }
-        if (currentDegree == 0)
+        if (vtx->inDegree == 0)
         {
             producedNum++;
-            if (producedNum == 1)
-            {
+            if (producedNum == 0)
                 nextId = id;
-            }
             else
             {
-                {
-                    Guard l(x_topLevel);
-                    m_topLevel.push(id);
-                }
-                cv_topLevel.notify_one();  // await other thread
+                m_topLevel.push(id);
             }
         }
     }
 
-    Guard l(x_totalConsume);
-    m_totalConsume += 1;
-    if (m_totalConsume >= m_totalVtxs)
-        cv_topLevel.notify_all();  // If DAG reach the end, awake all waitPop thread to exit
-
-    // PARA_LOG(TRACE) << LOG_BADGE("DAG") << LOG_DESC("consumed")
+    // PARA_LOG(TRACE) << LOG_BADGE("TbbCqDAG") << LOG_DESC("consumed")
     //                << LOG_KV("queueSize", m_topLevel.size());
     // for (ID id = 0; id < m_vtxs.size(); id++)
     // printVtx(id);
     return nextId;
 }
 
-void DAG::clear()
+void TbbCqDAG::clear()
 {
-    m_vtxs = std::vector<std::shared_ptr<Vertex>>();
-    Guard l(x_topLevel);
-    m_topLevel = queue<ID>();
+    m_vtxs = std::vector<std::shared_ptr<TbbCqVertex>>();
+    // XXXX m_topLevel.clear();
 }
 
-void DAG::printVtx(ID _id)
+void TbbCqDAG::printVtx(ID _id)
 {
     for (ID id : m_vtxs[_id]->outEdge)
     {
-        PARA_LOG(TRACE) << LOG_BADGE("DAG") << LOG_DESC("VertexEdge") << LOG_KV("ID", _id)
+        PARA_LOG(TRACE) << LOG_BADGE("TbbCqDAG") << LOG_DESC("TbbCqVertexEdge") << LOG_KV("ID", _id)
                         << LOG_KV("inDegree", m_vtxs[_id]->inDegree) << LOG_KV("edge", id);
     }
 }

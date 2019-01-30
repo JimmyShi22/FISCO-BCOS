@@ -43,15 +43,17 @@ MemoryTableFactory::MemoryTableFactory() : m_blockHash(h256(0)), m_blockNum(0)
     m_sysTables.push_back(SYS_CNS);
     m_sysTables.push_back(SYS_CONFIG);
     m_sysTables.push_back(SYS_BLOCK_2_NONCES);
+    m_sysTables.push_back(DAG_TRANSFER);
 }
 
 Table::Ptr MemoryTableFactory::openTable(const string& tableName, bool authorityFlag)
 {
     auto it = m_name2Table.find(tableName);
     if (it != m_name2Table.end())
-    {
-        STORAGE_LOG(TRACE) << LOG_BADGE("MemoryTableFactory") << LOG_DESC("table already open")
-                           << LOG_KV("table name", tableName);
+    { /*
+         STORAGE_LOG(TRACE) << LOG_BADGE("MemoryTableFactory") << LOG_DESC("table already open")
+                            << LOG_KV("table name", tableName);
+                            */
         return it->second;
     }
     auto tableInfo = make_shared<storage::TableInfo>();
@@ -66,9 +68,10 @@ Table::Ptr MemoryTableFactory::openTable(const string& tableName, bool authority
         auto tableEntries = tempSysTable->select(tableName, tempSysTable->newCondition());
         if (tableEntries->size() == 0u)
         {
+            /*
             STORAGE_LOG(DEBUG) << LOG_BADGE("MemoryTableFactory")
                                << LOG_DESC("table doesn't exist in _sys_tables_")
-                               << LOG_KV("table name", tableName);
+                               << LOG_KV("table name", tableName);*/
             return nullptr;
         }
         auto entry = tableEntries->get(0);
@@ -113,6 +116,7 @@ Table::Ptr MemoryTableFactory::openTable(const string& tableName, bool authority
     memoryTable->setTableInfo(tableInfo);
     memoryTable->setRecorder([&](Table::Ptr _table, Change::Kind _kind, string const& _key,
                                  vector<Change::Record>& _records) {
+        return;  // XXX ignore it for testing
         dev::WriteGuard l(x_changeLog);
         m_changeLog.emplace_back(_table, _kind, _key, _records);
     });
@@ -125,10 +129,11 @@ Table::Ptr MemoryTableFactory::openTable(const string& tableName, bool authority
 Table::Ptr MemoryTableFactory::createTable(const string& tableName, const string& keyField,
     const std::string& valueField, bool authorigytFlag, Address const& _origin)
 {
+    /*
     STORAGE_LOG(DEBUG) << LOG_BADGE("MemoryTableFactory") << LOG_DESC("create table")
                        << LOG_KV("table name", tableName) << LOG_KV("blockHash", m_blockHash)
                        << LOG_KV("blockNum", m_blockNum);
-
+*/
     auto sysTable = openTable(SYS_TABLES, authorigytFlag);
 
     // To make sure the table exists
@@ -181,6 +186,9 @@ h256 MemoryTableFactory::hash()
         }
 
         bytes tableHash = table->hash().asBytes();
+        // LOG(DEBUG) << LOG_BADGE("Report") << LOG_DESC("tableHash")
+        //<< LOG_KV(it.first, dev::sha256(ref(tableHash)));
+
         data.insert(data.end(), tableHash.begin(), tableHash.end());
     }
     if (data.empty())
@@ -188,6 +196,7 @@ h256 MemoryTableFactory::hash()
         return h256();
     }
     m_hash = dev::sha256(&data);
+    // LOG(DEBUG) << LOG_BADGE("Report") << LOG_DESC("allTableHash") << LOG_KV("stateRoot", m_hash);
     return m_hash;
 }
 
@@ -206,8 +215,8 @@ void MemoryTableFactory::rollback(size_t _savepoint)
             auto data = change.table->data();
             auto entries = (*data)[change.key];
             entries->removeEntry(change.value[0].index);
-            if (entries->size() == 0u)
-                data->erase(change.key);
+            // if (entries->size() == 0u)
+            //    data->erase(change.key);
             break;
         }
         case Change::Update:
@@ -281,6 +290,7 @@ void MemoryTableFactory::commitDB(h256 const& _blockHash, int64_t _blockNumber)
     }
 
     m_name2Table.clear();
+    dev::WriteGuard l(x_changeLog);
     m_changeLog.clear();
 }
 
@@ -337,6 +347,11 @@ storage::TableInfo::Ptr MemoryTableFactory::getSysTableInfo(const std::string& t
     {
         tableInfo->key = "number";
         tableInfo->fields = std::vector<std::string>{SYS_VALUE};
+    }
+    else if (tableName == DAG_TRANSFER)
+    {
+        tableInfo->key = "user_name";
+        tableInfo->fields = std::vector<std::string>{"user_balance"};
     }
     return tableInfo;
 }

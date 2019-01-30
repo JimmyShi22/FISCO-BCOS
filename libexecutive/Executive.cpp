@@ -104,12 +104,14 @@ bool Executive::execute()
     // Entry point for a user-executed transaction.
 
     // Pay...
+    /*
     LOG(TRACE) << "Paying " << m_gasCost << " from sender for gas (" << m_t.gas() << " gas at "
                << m_t.gasPrice() << ")";
+               */
     // m_s.subBalance(m_t.sender(), m_gasCost);
 
     uint64_t txGasLimit = m_envInfo.precompiledEngine()->txGasLimit();
-    LOG(TRACE) << "Practical limitation of tx gas: " << txGasLimit;
+    // LOG(TRACE) << "Practical limitation of tx gas: " << txGasLimit;
 
     assert(txGasLimit >= (u256)m_baseGasRequired);
     if (m_t.isCreation())
@@ -138,7 +140,7 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
         // Increment associated nonce for sender.
         // if (_p.senderAddress != MaxAddress ||
         // m_envInfo.number() < m_sealEngine.chainParams().experimentalForkBlock)  // EIP86
-        m_s->incNonce(_p.senderAddress);
+        // m_s->incNonce(_p.senderAddress);
     }
 
     m_savepoint = m_s->savepoint();
@@ -159,7 +161,7 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
     {
         m_gas = _p.gas;
 
-        LOG(DEBUG) << "Execute Precompiled: " << _p.codeAddress;
+        // LOG(DEBUG) << "Execute Precompiled: " << _p.codeAddress;
 
         auto result = m_envInfo.precompiledEngine()->call(_origin, _p.codeAddress, _p.data);
         size_t outputSize = result.size();
@@ -178,7 +180,7 @@ bool Executive::call(CallParameters const& _p, u256 const& _gasPrice, Address co
     }
 
     // Transfer ether.
-    m_s->transferBalance(_p.senderAddress, _p.receiveAddress, _p.valueTransfer);
+    // m_s->transferBalance(_p.senderAddress, _p.receiveAddress, _p.valueTransfer);
     return !m_ext;
 }
 

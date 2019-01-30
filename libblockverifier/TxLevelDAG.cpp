@@ -15,12 +15,12 @@
  * (c) 2016-2018 fisco-dev contributors.
  */
 /**
- * @brief : Generate transaction DAG for parallel execution
+ * @brief : Generate transaction DAG with level for parallel execution
  * @author: jimmyshi
- * @date: 2019-1-8
+ * @date: 2019-1-16
  */
 
-#include "TxDAG.h"
+#include "TxLevelDAG.h"
 #include "Common.h"
 #include <map>
 
@@ -30,12 +30,11 @@ using namespace dev::eth;
 using namespace dev::blockverifier;
 
 // Generate DAG according with given transactions
-void TxDAG::init(ExecutiveContext::Ptr _ctx, Transactions const& _txs)
+void TxLevelDAG::init(ExecutiveContext::Ptr _ctx, Transactions const& _txs)
 {
     m_txs = make_shared<Transactions const>(_txs);
-    m_dag.init(_txs.size());
 
-    CriticalField<string> latestCriticals;
+    LevelCriticalField<string> latestCriticals;
 
     for (ID id = 0; id < _txs.size(); id++)
     {
@@ -51,68 +50,61 @@ void TxDAG::init(ExecutiveContext::Ptr _ctx, Transactions const& _txs)
         // Get critical field
         vector<string> criticals = p->getDagTag(ref(tx.data()));
 
-        // Add edge between critical transaction
+        // Add tx id into maxlevel + 1
+        LevelID maxLevelId = INVALID_LevelID;
         for (string const& c : criticals)
         {
-            ID pIds = latestCriticals.get(c);
-            if (pIds != INVALID_ID)
-            {
-                m_dag.addEdge(pIds, id);  // add DAG edge
-            }
+            maxLevelId = max(maxLevelId, latestCriticals.get(c));
         }
+        LevelID currTxLevel = maxLevelId + 1;
+        addToLevel(id, currTxLevel);
 
+        // update critical field
         for (string const& c : criticals)
         {
-            latestCriticals.update(c, id);
+            latestCriticals.update(c, currTxLevel);
         }
     }
 
-    // Generate DAG
-    m_dag.generate();
-
-    m_totalParaTxs = _txs.size() - serialTxs.size();
+    size_t maxLevelSize = 0;
+    for (auto& level : m_levels)
+        maxLevelSize = max(maxLevelSize, level->size());
+    PARA_LOG(DEBUG) << LOG_BADGE("LevelDAG") << LOG_DESC("level info")
+                    << LOG_KV("levels", m_levels.size()) << LOG_KV("maxLevelSize", maxLevelSize);
 }
 
 // Set transaction execution function
-void TxDAG::setTxExecuteFunc(ExecuteTxFunc const& _f)
+void TxLevelDAG::setTxExecuteFunc(ExecuteTxFunc const& _f)
 {
     f_executeTx = _f;
 }
 
-int TxDAG::executeUnit()
+int TxLevelDAG::executeByID(ID _id)
 {
-    // PARA_LOG(TRACE) << LOG_DESC("executeUnit") << LOG_KV("exeCnt", m_exeCnt)
-    //              << LOG_KV("total", m_txs->size());
-    ID id;
-    {
-        id = m_dag.waitPop();
-        if (id == INVALID_ID)
-            return 0;
-    }
-
-    int exeCnt = 0;
-    // PARA_LOG(TRACE) << LOG_DESC("executeUnit transaction") << LOG_KV("txid", id);
-    // TODO catch execute exception
-    while (id != INVALID_ID)
-    {
-        f_executeTx((*m_txs)[id], id);
-
-        id = m_dag.consume(id);
-
-        exeCnt += 1;
-        Guard l(x_exeCnt);
-        m_exeCnt += 1;
-        // PARA_LOG(TRACE) << LOG_DESC("executeUnit finish") << LOG_KV("exeCnt", m_exeCnt)
-        //                << LOG_KV("total", m_txs->size());
-    }
-    return exeCnt;
+    f_executeTx((*m_txs)[_id], _id);
+    return 1;
 }
 
-void TxDAG::executeSerialTxs()
+std::shared_ptr<IDs> TxLevelDAG::getDAGLevel()
 {
-    for (ID id : serialTxs)
+    if (m_currentExecuteLevel >= LevelID(m_levels.size()))
+        return nullptr;
+    m_currentExecuteLevel++;
+    return m_levels[m_currentExecuteLevel - 1];
+}
+
+
+void TxLevelDAG::addToLevel(ID _id, LevelID _level)
+{
+    if (_level < 0)
+        return;
+    // add new level if not exist
+    if (m_levels.size() <= (size_t)_level)
     {
-        // TODO catch execute exception
-        f_executeTx((*m_txs)[id], id);
+        size_t needNewLevels = (size_t)_level - m_levels.size() + 1;
+        for (size_t i = 0; i < needNewLevels; i++)
+            m_levels.emplace_back(make_shared<IDs>());
     }
+
+    m_levels[_level]->emplace_back(_id);
 }

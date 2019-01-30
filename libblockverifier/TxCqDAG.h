@@ -21,8 +21,9 @@
  */
 
 #pragma once
-#include "DAG.h"
-#include "ExecutiveContext.h"
+#include "CqDAG.h"
+#include "TbbCqDAG.h"
+#include "TxDAG.h"
 #include <libethcore/Block.h>
 #include <libethcore/Transaction.h>
 #include <memory>
@@ -32,48 +33,13 @@
 
 namespace dev
 {
-namespace precompile
-{
-class DagTransferPrecompiled
-{
-public:
-    static bool isDagTransfer(dev::Address addr) { return true; }
-    static std::vector<std::string> getTransferDagTag(dev::eth::Transaction const& param)
-    {
-        h256 txHash = param.sha3();
-        std::vector<std::string> res;
-        // return res;
-        for (size_t i = 0; i < 2; i++)
-        {
-            std::string randStr = std::string() + char(txHash.data()[i] % 10);
-            res.emplace_back(randStr);
-        }
-        return res;
-    }
-};
-
-}  // namespace precompile
-
 namespace blockverifier
 {
-using ExecuteTxFunc = std::function<bool(dev::eth::Transaction const&, ID)>;
-
-class TxDAGFace
+class TxCqDAG : public TxDAGFace
 {
 public:
-    virtual bool hasFinished() = 0;
-
-    // Called by thread
-    // Execute a unit in DAG
-    // This function can be parallel
-    virtual int executeUnit() = 0;
-};
-
-class TxDAG : public TxDAGFace
-{
-public:
-    TxDAG() : m_dag() {}
-    ~TxDAG() {}
+    TxCqDAG() : m_dag() {}
+    ~TxCqDAG() {}
 
     // Generate DAG according with given transactions
     void init(ExecutiveContext::Ptr _ctx, dev::eth::Transactions const& _txs);
@@ -101,7 +67,7 @@ private:
     std::shared_ptr<dev::eth::Transactions const> m_txs;
 
     IDs serialTxs;
-    DAG m_dag;
+    CqDAG m_dag;
 
     ID m_exeCnt = 0;
     ID m_totalParaTxs = 0;
@@ -109,23 +75,46 @@ private:
     mutable std::mutex x_exeCnt;
 };
 
-template <typename T>
-class CriticalField
+class TxTbbCqDAG : public TxDAGFace
 {
 public:
-    ID get(T const& _c)
-    {
-        auto it = m_criticals.find(_c);
-        if (it == m_criticals.end())
-            return INVALID_ID;
-        return it->second;
-    }
+    TxTbbCqDAG() : m_dag() {}
+    ~TxTbbCqDAG() {}
 
-    void update(T const& _c, ID _txId) { m_criticals[_c] = _txId; }
+    // Generate DAG according with given transactions
+    void init(ExecutiveContext::Ptr _ctx, dev::eth::Transactions const& _txs);
+
+    // Set transaction execution function
+    void setTxExecuteFunc(ExecuteTxFunc const& _f);
+
+    // Called by thread
+    // Has the DAG reach the end?
+    bool hasFinished() override { return m_exeCnt >= m_totalParaTxs; }
+
+    // Called by thread
+    // Execute a unit in DAG
+    // This function can be parallel
+    int executeUnit() override;
+
+    void executeSerialTxs();
+
+    ID paraTxsNumber() { return m_totalParaTxs; }
+
+    ID haveExecuteNumber() { return m_exeCnt; }
 
 private:
-    std::map<T, ID> m_criticals;
+    ExecuteTxFunc f_executeTx;
+    std::shared_ptr<dev::eth::Transactions const> m_txs;
+
+    IDs serialTxs;
+    CqDAG m_dag;
+
+    ID m_exeCnt = 0;
+    ID m_totalParaTxs = 0;
+
+    mutable std::mutex x_exeCnt;
 };
+
 
 }  // namespace blockverifier
 }  // namespace dev

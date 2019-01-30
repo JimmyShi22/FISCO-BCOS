@@ -41,7 +41,7 @@ namespace blockverifier
 class CountDownLatch
 {
 public:
-    CountDownLatch(int _count) : m_count(_count) {}
+    CountDownLatch(int _count) : m_count(_count), m_init(_count) {}
     CountDownLatch(const CountDownLatch&) = delete;
 
     void wait()
@@ -71,6 +71,7 @@ private:
     std::mutex m_mutex;
     std::condition_variable m_cv;
     int m_count;
+    int m_init;
 };
 
 class WakeupNotifier
@@ -115,14 +116,14 @@ private:
 class ParaTxWorker : dev::Worker
 {
 public:
-    ParaTxWorker(std::shared_ptr<WakeupNotifier> _wakeupNotifier, std::string const& _name = "anon",
+    ParaTxWorker(WakeupNotifier& _wakeupNotifier, std::string const& _name = "anon",
         unsigned _idleWaitMs = 30)
       : dev::Worker(_name, _idleWaitMs),
         m_txDAG(nullptr),
         m_wakeupNotifier(_wakeupNotifier),
         m_countDownLatch(nullptr)
     {}
-    void setDAG(std::shared_ptr<TxDAG> _txDAG) { m_txDAG = _txDAG; }
+    void setDAG(std::shared_ptr<TxDAGFace> _txDAG) { m_txDAG = _txDAG; }
     void setCountDownLatch(std::shared_ptr<CountDownLatch> _latch) { m_countDownLatch = _latch; }
     void start() { startWorking(); }
 
@@ -131,25 +132,25 @@ protected:
     void doWork() override;
 
 private:
-    std::shared_ptr<TxDAG> m_txDAG;
-    std::shared_ptr<WakeupNotifier> m_wakeupNotifier;
+    std::shared_ptr<TxDAGFace> m_txDAG;
+    WakeupNotifier& m_wakeupNotifier;
     std::shared_ptr<CountDownLatch> m_countDownLatch;
 };
 
 class ParaTxExecutor
 {
 public:
-    ParaTxExecutor() { m_wakeupNotifier = std::make_shared<WakeupNotifier>(); }
+    ParaTxExecutor() {}
     // Initialize thread pool when fisco-bcos process started
-    void initialize(unsigned _threadNum = std::thread::hardware_concurrency());
+    void initialize(unsigned _threadNum = std::thread::hardware_concurrency() - 1);
     // Start to execute DAG, block the calller until the execution of DAG is finished
-    void start(std::shared_ptr<TxDAG> _txDAG);
+    void start(std::shared_ptr<TxDAGFace> _txDAG);
     // Count of the worker threads;
     unsigned threadNum() { return m_workers.size(); }
 
 private:
     std::vector<ParaTxWorker> m_workers;
-    std::shared_ptr<WakeupNotifier> m_wakeupNotifier;
+    std::vector<std::shared_ptr<WakeupNotifier>> m_notifiers;
 };
 }  // namespace blockverifier
 }  // namespace dev

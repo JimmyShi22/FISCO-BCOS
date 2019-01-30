@@ -22,7 +22,6 @@
 #include "Rpc.h"
 #include "Common.h"
 #include "JsonHelper.h"
-#include <include/BuildInfo.h>
 #include <jsonrpccpp/common/exception.h>
 #include <libconfig/SystemConfigMgr.h>
 #include <libdevcore/CommonData.h>
@@ -276,9 +275,9 @@ Json::Value Rpc::getClientVersion()
         Json::Value version;
 
 #ifdef FISCO_GM
-        version["FISCO-BCOS GM Version"] = FISCO_BCOS_PROJECT_VERSION;
+        version["FISCO-BCOS GM Version"] = "jimmyshi test for faster compile";
 #else
-        version["FISCO-BCOS Version"] = FISCO_BCOS_PROJECT_VERSION;
+        version["FISCO-BCOS Version"] = "jimmyshi test for faster compile";
 #endif
         version["Build Time"] = DEV_QUOTED(FISCO_BCOS_BUILD_TIME);
         version["Build Type"] = std::string(DEV_QUOTED(FISCO_BCOS_BUILD_PLATFORM)) + "/" +

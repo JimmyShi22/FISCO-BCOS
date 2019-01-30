@@ -23,7 +23,10 @@
 
 #pragma once
 #include "Common.h"
+#include "DAG.h"
 #include <libdevcore/Guards.h>
+#include <libdevcore/concurrent_queue.h>
+#include <tbb/concurrent_queue.h>
 #include <condition_variable>
 #include <cstdint>
 #include <queue>
@@ -34,23 +37,18 @@ namespace dev
 {
 namespace blockverifier
 {
-using ID = uint32_t;
-using IDs = std::vector<ID>;
-static const ID INVALID_ID = (ID(0) - 1);
-
-struct Vertex
+struct TbbCqVertex
 {
-    ID inDegree;
+    std::atomic<ID> inDegree;
     std::vector<ID> outEdge;
-    mutable dev::SharedMutex vtxLock;
 };
 
-class DAG
+class TbbCqDAG
 {
     // Just algorithm, not thread safe
 public:
-    DAG(){};
-    ~DAG();
+    TbbCqDAG(){};
+    ~TbbCqDAG();
 
     // Init DAG basic memory, should call before other function
     // _maxSize is max ID + 1
@@ -75,8 +73,8 @@ public:
     void clear();
 
 private:
-    std::vector<std::shared_ptr<Vertex>> m_vtxs;
-    std::queue<ID> m_topLevel;
+    std::vector<std::shared_ptr<TbbCqVertex>> m_vtxs;
+    tbb::concurrent_queue<ID> m_topLevel;
 
     ID m_totalVtxs = 0;
     ID m_totalConsume = 0;
@@ -84,7 +82,6 @@ private:
 private:
     void printVtx(ID _id);
     mutable std::mutex x_topLevel;
-    mutable std::mutex x_totalConsume;
     std::condition_variable cv_topLevel;
 };
 
