@@ -34,10 +34,12 @@
 #include <libstorage/BasicRocksDB.h>
 #include <libstorage/CachedStorage.h>
 #include <libstorage/LevelDBStorage.h>
+#include <libstorage/LevelDBStorage2.h>
 #include <libstorage/MemoryTableFactoryFactory.h>
 #include <libstorage/MemoryTableFactoryFactory2.h>
 #include <libstorage/RocksDBStorage.h>
 #include <libstorage/SQLStorage.h>
+#include <libstorage/SetIDStorage.h>
 #include <libstorage/ZdbStorage.h>
 #include <libstoragestate/StorageStateFactory.h>
 
@@ -69,6 +71,10 @@ void DBInitializer::initStorageDB()
     else if (!dev::stringCmpIgnoreCase(m_param->mutableStorageParam().type, "MySQL"))
     {
         initZdbStorage();
+    }
+    else if (!dev::stringCmpIgnoreCase(m_param->mutableStorageParam().type, "LevelDB2"))
+    {
+        initLevelDBStorage2();
     }
     else if (!dev::stringCmpIgnoreCase(m_param->mutableStorageParam().type, "RocksDB"))
     {
@@ -137,7 +143,45 @@ void DBInitializer::initLevelDBStorage()
         BOOST_THROW_EXCEPTION(OpenDBFailed() << errinfo_comment("initLevelDBStorage failed"));
     }
 }
+void DBInitializer::initLevelDBStorage2()
+{
+    DBInitializer_LOG(INFO) << LOG_BADGE("initLevelDBStorage2");
+    /// open and init the levelDB
+    leveldb::Options ldb_option;
+    dev::db::BasicLevelDB* pleveldb = nullptr;
+    try
+    {
+        m_param->mutableStorageParam().path = m_param->mutableStorageParam().path + "/LevelDB2";
+        boost::filesystem::create_directories(m_param->mutableStorageParam().path);
+        ldb_option.create_if_missing = true;
+        ldb_option.max_open_files = 1000;
+        ldb_option.compression = leveldb::kSnappyCompression;
+        leveldb::Status status;
 
+        // Not to use disk encryption
+        DBInitializer_LOG(DEBUG) << LOG_DESC("open leveldb handler");
+        status = BasicLevelDB::Open(ldb_option, m_param->mutableStorageParam().path, &(pleveldb));
+
+        if (!status.ok())
+        {
+            throw std::runtime_error("open LevelDB failed");
+        }
+        DBInitializer_LOG(DEBUG) << LOG_BADGE("initLevelDBStorage")
+                                 << LOG_KV("status", status.ok());
+        std::shared_ptr<LevelDBStorage2> leveldbStorage = std::make_shared<LevelDBStorage2>();
+        std::shared_ptr<dev::db::BasicLevelDB> leveldb_handler =
+            std::shared_ptr<dev::db::BasicLevelDB>(pleveldb);
+        leveldbStorage->setDB(leveldb_handler);
+        initTableFactory2(leveldbStorage);
+    }
+    catch (std::exception& e)
+    {
+        DBInitializer_LOG(ERROR) << LOG_DESC("initLevelDBStorage2 failed")
+                                 << LOG_KV("EINFO", boost::diagnostic_information(e));
+        BOOST_THROW_EXCEPTION(OpenDBFailed() << errinfo_comment("initLevelDBStorage failed"));
+    }
+}
+/*
 void DBInitializer::initTableFactory2(Storage::Ptr _backend)
 {
     auto cachedStorage = std::make_shared<CachedStorage>();
@@ -168,6 +212,19 @@ void DBInitializer::initTableFactory2(Storage::Ptr _backend)
     tableFactoryFactory->setStorage(cachedStorage);
 
     m_storage = cachedStorage;
+    m_tableFactoryFactory = tableFactoryFactory;
+}
+ */
+void DBInitializer::initTableFactory2(Storage::Ptr _backend)
+{
+    auto setIDStorage = std::make_shared<SetIDStorage>();
+    setIDStorage->setBackend(_backend);
+
+
+    auto tableFactoryFactory = std::make_shared<dev::storage::MemoryTableFactoryFactory2>();
+    tableFactoryFactory->setStorage(setIDStorage);
+
+    m_storage = setIDStorage;
     m_tableFactoryFactory = tableFactoryFactory;
 }
 
@@ -241,7 +298,7 @@ std::shared_ptr<dev::db::BasicRocksDB> DBInitializer::initBasicRocksDB()
     // set Parallelism to the hardware concurrency
     options.IncreaseParallelism(std::max(1, (int)std::thread::hardware_concurrency()));
 
-    options.OptimizeLevelStyleCompaction();
+    // options.OptimizeLevelStyleCompaction(); // This option will increase much memory
     options.create_if_missing = true;
     options.max_open_files = 1000;
     options.compression = rocksdb::kSnappyCompression;

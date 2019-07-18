@@ -48,6 +48,13 @@ std::shared_ptr<rocksdb::DB> BasicRocksDB::Open(const Options& options, const st
     return m_db;
 }
 
+Status BasicRocksDB::GetSimple(ReadOptions const& options, Slice const& key, std::string* value)
+{
+    assert(m_db);
+    auto status = m_db->Get(options, key, value);
+    return status;
+}
+
 Status BasicRocksDB::Get(ReadOptions const& options, std::string const& key, std::string& value)
 {
     assert(m_db);

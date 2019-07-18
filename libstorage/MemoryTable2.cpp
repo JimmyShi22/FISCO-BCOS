@@ -303,7 +303,7 @@ dev::h256 MemoryTable2::hash()
 
 dev::storage::TableData::Ptr MemoryTable2::dump()
 {
-    TIME_RECORD("MemoryTable2 Dump");
+    // TIME_RECORD("MemoryTable2 Dump");
     if (m_isDirty)
     {
         m_tableData = std::make_shared<dev::storage::TableData>();
@@ -343,9 +343,9 @@ dev::storage::TableData::Ptr MemoryTable2::dump()
                 }
             });
 
-        TIME_RECORD("Sort data");
+        // TIME_RECORD("Sort data");
         tbb::parallel_sort(tempEntries.begin(), tempEntries.end(), EntryLessNoLock(m_tableInfo));
-        TIME_RECORD("Submmit data");
+        // TIME_RECORD("Submmit data");
         bytes allData;
         for (size_t i = 0; i < tempEntries.size(); ++i)
         {

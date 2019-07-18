@@ -97,6 +97,7 @@ protected:
 
 private:
     void initLevelDBStorage();
+    void initLevelDBStorage2();
     // below use MemoryTableFactory2
     void initSQLStorage();
     void initTableFactory2(dev::storage::Storage::Ptr _backend);

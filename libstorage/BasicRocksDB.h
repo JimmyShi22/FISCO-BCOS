@@ -54,6 +54,8 @@ public:
     // get value from rocksDB according to the given key
     // if query successfully, return query status
     // if query failed, throw exception and exit directly
+    virtual rocksdb::Status GetSimple(
+        rocksdb::ReadOptions const& options, rocksdb::Slice const& key, std::string* value);
     virtual rocksdb::Status Get(
         rocksdb::ReadOptions const& options, std::string const& key, std::string& value);
 
