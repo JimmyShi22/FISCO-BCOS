@@ -18,48 +18,53 @@
  * @author: jimmyshi
  * @date 2018-11-14
  */
-#include "libinitializer/Initializer.h"
-#include "libstorage/MemoryTableFactory.h"
-#include <leveldb/db.h>
-#include <libdevcore/BasicLevelDB.h>
+
 #include <libdevcore/Common.h>
 #include <libdevcore/easylog.h>
-#include <libstorage/LevelDBStorage.h>
+#include <rocksdb/db.h>
+#include <rocksdb/table.h>
+#include <rocksdb/utilities/leveldb_options.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
+#include <memory>
 INITIALIZE_EASYLOGGINGPP
 
 using namespace std;
 using namespace dev;
 using namespace boost;
-using namespace dev::storage;
+using namespace rocksdb;
 
-int main(int argc, const char* argv[])
+int main(int argc, char** argv)
 {
     (void)argc;
-    auto storagePath = "./test_leveldb";
-    cout << "DB path : " << storagePath << endl;
-    filesystem::create_directories(storagePath);
-    leveldb::Options option;
-    option.create_if_missing = true;
-    option.max_open_files = 1000;
-    dev::db::BasicLevelDB* dbPtr = NULL;
-    leveldb::Status s = dev::db::BasicLevelDB::Open(option, storagePath, &dbPtr);
-    if (!s.ok())
-    {
-        cerr << "Open storage leveldb error: " << s.ToString() << endl;
-        return -1;
-    }
 
-    auto storageDB = std::shared_ptr<dev::db::BasicLevelDB>(dbPtr);
+    DB* db;
+    auto storagePath = "./test_rocksleveldb";
+    cout << "DB path : " << storagePath << endl;
+    boost::filesystem::create_directories(storagePath);
+
+    LevelDBOptions opt;
+    opt.create_if_missing = true;
+    opt.max_open_files = 1000;
+    opt.block_size = 4096;
+
+    Options rocksdb_options = ConvertOptions(opt);
+    // add rocksdb specific options here
+
+    Status s = DB::Open(rocksdb_options, storagePath, &db);
+    std::shared_ptr<DB> storageDB;
+    storageDB.reset(db);
+
+
     int loop = atoi(argv[1]);
 
     string start = to_string(utcTime());
     for (int i = 0; i < loop; i++)
     {
-        auto batch = storageDB->createWriteBatch();
+        WriteBatch batch;
         for (int j = 0; j < 50000; j++)
         {
             string key = start + to_string(i * 50000 + j);
@@ -84,24 +89,20 @@ int main(int argc, const char* argv[])
                 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa"
                 "aaaaaaa";
-            batch->insertSlice(leveldb::Slice(key), leveldb::Slice(value));
+            batch.Put(Slice(std::move(key)), Slice(std::move(value)));
         }
 
-        leveldb::WriteOptions writeOptions;
-        writeOptions.sync = false;
-        auto s = storageDB->Write(writeOptions, &batch);
-        if (!s.ok())
-        {
-            cerr << "Open storage leveldb error: " << s.ToString() << endl;
-            return -1;
-        }
+        WriteOptions options;
+        options.sync = false;
+        storageDB->Write(options, &batch);
+
         cout << "Write: " << i << endl;
 
         for (int j = 0; j < 50000; j++)
         {
             string key = start + to_string(i * 50000 + j);
             string value;
-            storageDB->Get(leveldb::ReadOptions(), leveldb::Slice(key), &value);
+            storageDB->Get(ReadOptions(), rocksdb::Slice(key), &value);
         }
         cout << "Get: " << i << endl;
     }

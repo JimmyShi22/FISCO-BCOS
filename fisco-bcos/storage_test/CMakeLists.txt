@@ -24,6 +24,8 @@ file(GLOB HEADERS "*.h")
 
 add_executable(leveldb_test leveldb_test.cpp ${HEADERS})
 add_executable(rocksdb_test rocksdb_test.cpp ${HEADERS})
+add_executable(rocksleveldb_test rocksleveldb_test.cpp ${HEADERS} ${BOOST_INCLUDE_DIR})
 
 target_link_libraries(leveldb_test PUBLIC initializer)
 target_link_libraries(rocksdb_test PUBLIC initializer RocksDB)
+target_link_libraries(rocksleveldb_test PUBLIC initializer RocksDB)

@@ -25,6 +25,7 @@
 #include <libdevcore/easylog.h>
 #include <libstorage/BasicRocksDB.h>
 #include <libstorage/LevelDBStorage.h>
+#include <rocksdb/table.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -38,6 +39,7 @@ using namespace dev::storage;
 using namespace dev::db;
 using namespace rocksdb;
 
+
 int main(int argc, const char* argv[])
 {
     (void)argc;
@@ -46,19 +48,19 @@ int main(int argc, const char* argv[])
     filesystem::create_directories(storagePath);
 
     rocksdb::Options options;
-    /*
-        rocksdb::BlockBasedTableOptions table_options;
-        table_options.cache_index_and_filter_blocks = true;
-        table_options.block_cache = rocksdb::NewLRUCache(1 * 1024 * 1024 * 1024);
+    ///*
+    rocksdb::BlockBasedTableOptions table_options;
+    // table_options.cache_index_and_filter_blocks = true;
+    table_options.block_cache = rocksdb::NewLRUCache(1 * 256 * 1024 * 1024);
 
-        options.table_factory.reset(new rocksdb::BlockBasedTableFactory(table_options));
-    */
+    options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+    //*/
     // set Parallelism to the hardware concurrency
-    options.IncreaseParallelism(std::max(1, (int)std::thread::hardware_concurrency()));
+    // options.IncreaseParallelism(std::max(1, (int)std::thread::hardware_concurrency()));
 
     // options.OptimizeLevelStyleCompaction();
     options.create_if_missing = true;
-    options.max_open_files = 1000;
+    options.max_open_files = 200;
     options.compression = rocksdb::kSnappyCompression;
     auto storageDB = std::make_shared<BasicRocksDB>();
 

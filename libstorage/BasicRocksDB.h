@@ -26,6 +26,7 @@
 #include <rocksdb/db.h>
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
+#include <rocksdb/table.h>
 #include <rocksdb/write_batch.h>
 #include <tbb/spin_mutex.h>
 #include <memory>
