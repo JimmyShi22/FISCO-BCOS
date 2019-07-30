@@ -306,7 +306,7 @@ std::shared_ptr<dev::db::BasicRocksDB> DBInitializer::initBasicRocksDB()
 
     // options.OptimizeLevelStyleCompaction(); // This option will increase much memory too
     options.create_if_missing = true;
-    options.max_open_files = 1000;
+    options.max_open_files = 200;
     options.compression = rocksdb::kSnappyCompression;
     std::shared_ptr<BasicRocksDB> rocksDB = std::make_shared<BasicRocksDB>();
 
