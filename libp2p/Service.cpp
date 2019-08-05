@@ -23,6 +23,7 @@
 #include "libdevcore/FixedHash.h"      // for FixedHash, hash
 #include "libdevcore/ThreadPool.h"     // for ThreadPool
 #include "libnetwork/ASIOInterface.h"  // for ASIOInterface
+#include "libnetwork/Common.h"         // for SocketFace
 #include "libnetwork/SocketFace.h"     // for SocketFace
 #include "libp2p/P2PInterface.h"       // for CallbackFunc...
 #include "libp2p/P2PMessageFactory.h"  // for P2PMessageFa...
@@ -94,6 +95,9 @@ void Service::heartBeat()
     {
         return;
     }
+
+    checkWhitelistAndClearSession();
+
     std::map<dev::network::NodeIPEndpoint, NodeID> staticNodes;
     {
         RecursiveGuard l(x_nodes);
@@ -123,6 +127,12 @@ void Service::heartBeat()
             SERVICE_LOG(DEBUG) << LOG_DESC("heartBeat ignore invalid address");
             continue;
         }
+        if (m_whitelist != nullptr && !m_whitelist->has(it.second))
+        {
+            SERVICE_LOG(TRACE) << LOG_DESC("heartBeat outside whitelist")
+                               << LOG_KV("nodeid", it.second.abridged());
+            continue;
+        }
         SERVICE_LOG(DEBUG) << LOG_DESC("heartBeat try to reconnect")
                            << LOG_KV("endpoint", it.first.name());
         m_host->asyncConnect(
@@ -148,6 +158,37 @@ void Service::heartBeat()
             service->heartBeat();
         }
     });
+}
+
+// reset whitelist: stop session which is not in whitelist
+void Service::setWhitelist(PeerWhitelist::Ptr _whitelist)
+{
+    m_whitelist = _whitelist;
+    host()->setWhitelist(_whitelist);
+    checkWhitelistAndClearSession();
+}
+
+void Service::checkWhitelistAndClearSession()
+{
+    if (m_whitelist->enable() && m_sessions.size() != 0)
+    {
+        auto sessions = m_sessions;
+        for (auto session : sessions)
+        {
+            NodeID nodeID = session.first;
+            if (m_whitelist->has(nodeID))
+            {
+                // Find in whitelist
+                continue;
+            }
+
+            auto p2pSession = session.second;
+            std::string msg = "resetWhitelist: node " + nodeID.abridged() + " is not in whitelist";
+            NetworkException e(dev::network::P2PExceptionType::NotInWhitelist, msg);
+            p2pSession->stop(dev::network::UselessPeer);
+            onDisconnect(e, p2pSession);
+        }
+    }
 }
 
 /// update the staticNodes
