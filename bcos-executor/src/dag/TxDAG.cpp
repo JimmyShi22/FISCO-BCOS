@@ -32,53 +32,44 @@ using namespace bcos::executor::critical;
 #define DAG_LOG(LEVEL) BCOS_LOG(LEVEL) << LOG_BADGE("DAG")
 
 // Generate DAG according with given transactions
-void TxDAG::init(size_t count, const std::vector<std::vector<std::string>>& _txsCriticals, ExecuteTxFunc const& _f)
+void TxDAG::init(critical::CriticalFieldsInterface::Ptr _txsCriticals, ExecuteTxFunc const& _f)
 {
-    auto txsSize = count;
+    auto txsSize = _txsCriticals->size();
     DAG_LOG(TRACE) << LOG_DESC("Begin init transaction DAG") << LOG_KV("transactionNum", txsSize);
+
+    f_executeTx = _f;
+    m_totalParaTxs = _txsCriticals->size();
+
+    // init DAG
     m_dag.init(txsSize);
 
-    CriticalFieldsRecorder<string> latestCriticals;
+    // define conflict handler
+    auto onConflictHandler = [&](ID pId, ID id) {
+        m_dag.addEdge(pId, id);
+    };
+    auto onFirstConflictHandler = [&](ID id) {
+        // do nothing
+        (void)id;
+    };
+    auto onEmptyConflictHandler = [&](ID id) {
+        // do nothing
+        (void)id;
+    };
+    auto onAllConflictHandler = [&](ID id) {
+        // do nothing
+        // ignore normal tx, only handle DAG tx, normal tx has been sent back to be executed by DMT
+        (void)id;
+    };
 
-    for (ID id = 0; id < txsSize; ++id)
-    {
-        auto criticals = _txsCriticals[id];
-        if (!criticals.empty())
-        {
-            // DAG transaction: Conflict with certain critical fields
-            // Get critical field
-
-            // Add edge between critical transaction
-            std::set<ID> pIds;
-            for (string const& c : criticals)
-            {
-                ID pId = latestCriticals.get(c);
-                if (pId != INVALID_ID)
-                {
-                    pIds.insert(pId);
-                }
-            }
-
-            for(ID pId : pIds) {
-                m_dag.addEdge(pId, id);
-            }
-
-            for (string const& c : criticals)
-            {
-                latestCriticals.update(c, id);
-            }
-        }
-        else
-        {
-            continue; // ignore normal tx, only handle DAG tx, normal tx has been sent back to be executed by DMT
-        }
-    }
+    // parse criticals
+    _txsCriticals->parse(
+        onConflictHandler,
+        onFirstConflictHandler,
+        onEmptyConflictHandler,
+        onAllConflictHandler);
 
     // Generate DAG
     m_dag.generate();
-
-    m_totalParaTxs = txsSize;
-    f_executeTx = _f;
 
     DAG_LOG(TRACE) << LOG_DESC("End init transaction DAG");
 }

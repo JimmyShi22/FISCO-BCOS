@@ -43,25 +43,34 @@ void TxDAG2::init(critical::CriticalFieldsInterface::Ptr _txsCriticals, ExecuteT
     // Generate tasks in m_tasks
     // Note: we must generate every task in m_tasks before make_edge(). Otherwise, may lead to core.
     using Msg = const continue_msg&;
+    std::vector<size_t> id2TaskId(txsSize);
     for (ID id = 0; id < _txsCriticals->size(); ++id)
     {
-        // generate tasks
-        auto task = [this, id](Msg) {
-            f_executeTx(id);
-        };
-        auto t = Task(m_dag, std::move(task));
-        m_tasks.push_back(t);
+        if (_txsCriticals->contains(id))
+        {
+            // generate tasks
+            auto task = [this, id](Msg) { f_executeTx(id); };
+            auto t = Task(m_dag, std::move(task));
+            auto taskId = m_tasks.size();
+            m_tasks.push_back(t);
+
+            id2TaskId[id] = taskId;
+        }
     }
 
     // define conflict handler
     auto onConflictHandler = [&](ID pId, ID id) {
-        make_edge(m_tasks[pId], m_tasks[id]);
+        auto pTaskId = id2TaskId[pId];
+        auto taskId = id2TaskId[id];
+        make_edge(m_tasks[pTaskId], m_tasks[taskId]);
     };
     auto onFirstConflictHandler = [&](ID id) {
-        make_edge(m_startTask, m_tasks[id]);
+        auto taskId = id2TaskId[id];
+        make_edge(m_startTask, m_tasks[taskId]);
     };
     auto onEmptyConflictHandler = [&](ID id) {
-        make_edge(m_startTask, m_tasks[id]);
+        auto taskId = id2TaskId[id];
+        make_edge(m_startTask, m_tasks[taskId]);
     };
     auto onAllConflictHandler = [&](ID id) {
         // do nothing

@@ -30,6 +30,8 @@ public:
 
     virtual size_t size() = 0;
 
+    virtual bool contains(size_t id) = 0;
+
     virtual void parse(OnConflictHandler const& _onConflict,
         OnFirstConflictHandler const& _onFirstConflict,
         OnEmptyConflictHandler const& _onEmptyConflict,
@@ -88,6 +90,7 @@ public:
     CriticalFields(size_t _size): m_criticals(std::vector<CriticalFieldPtr>(_size)) {}
 
     size_t size() override { return m_criticals.size(); }
+    bool contains(size_t id) override { return id < size() && get(id) != nullptr; };
     void put(size_t _id, CriticalFieldPtr _criticalField) { m_criticals[_id] = _criticalField; }
     CriticalFieldPtr get(size_t _id) { return m_criticals[_id];}
 
