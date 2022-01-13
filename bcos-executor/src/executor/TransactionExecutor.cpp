@@ -24,7 +24,9 @@
 #include "../dag/Abi.h"
 #include "../dag/ClockCache.h"
 #include "../dag/ScaleUtils.h"
+#include "../dag/CriticalFields.h"
 #include "../dag/TxDAG.h"
+#include "../dag/TxDAG2.h"
 #include "../executive/BlockContext.h"
 #include "../executive/TransactionExecutive.h"
 #include "../precompiled/CNSPrecompiled.h"
@@ -81,6 +83,7 @@
 using namespace bcos;
 using namespace std;
 using namespace bcos::executor;
+using namespace bcos::executor::critical;
 using namespace bcos::wasm;
 using namespace bcos::protocol;
 using namespace bcos::storage;
@@ -277,8 +280,8 @@ void TransactionExecutor::dagExecuteTransactionsForEvm(gsl::span<CallParameters:
     vector<ExecutionMessage::UniquePtr> executionResults(transactionsNum);
 
     // get criticals
-    std::vector<std::vector<std::string>> txsCriticals;
-    txsCriticals.resize(transactionsNum);
+    CriticalFields<string>::Ptr txsCriticals = make_shared<CriticalFields<string>>();
+
     size_t serialTransactionsNum = 0;
     tbb::parallel_for(tbb::blocked_range<uint64_t>(0, transactionsNum),
         [&](const tbb::blocked_range<uint64_t>& range) {
@@ -298,8 +301,7 @@ void TransactionExecutor::dagExecuteTransactionsForEvm(gsl::span<CallParameters:
             }
         });
 
-    shared_ptr<TxDAG> txDag = make_shared<TxDAG>();
-    txDag->init(transactionsNum, txsCriticals);
+
 
     vector<TransactionExecutive::Ptr> allExecutives(transactionsNum);
     vector<std::unique_ptr<CallParameters>> allCallParameters(transactionsNum);
@@ -325,46 +327,33 @@ void TransactionExecutor::dagExecuteTransactionsForEvm(gsl::span<CallParameters:
         allIndex[i] = i;
     }
 
-    txDag->setTxExecuteFunc(
-        [this, &executionResults](bcos::executor::TransactionExecutive::Ptr executive,
-            CallParameters::UniquePtr callParameters, gsl::index index) {
-            EXECUTOR_LOG(TRACE) << LOG_BADGE("dagExecuteTransactionsForEvm")
-                                << LOG_DESC("Start transaction")
-                                << LOG_KV("to", callParameters->receiveAddress)
-                                << LOG_KV("data", toHexStringWithPrefix(callParameters->data));
-            try
-            {
-                auto output = executive->start(std::move(callParameters));
+    shared_ptr<TxDAGInterface> txDag = make_shared<TxDAG2>();
+    txDag->init(txsCriticals,
+        [this, &executionResults, &allExecutives, &allCallParameters, &allIndex](ID id) {
+            if (allExecutives[id] && allCallParameters.at(id)) {
+                auto executive = allExecutives[id];
+                auto index = allIndex[id];
 
-                executionResults[index] = toExecutionResult(*executive, std::move(output));
-            }
-            catch (std::exception& e)
-            {
-                EXECUTOR_LOG(ERROR) << "Execute error: " << boost::diagnostic_information(e);
+                EXECUTOR_LOG(DEBUG) << LOG_BADGE("dagExecuteTransactionsForEvm")
+                                    << LOG_DESC("Start transaction")
+                                    << LOG_KV("to", allCallParameters.at(id)->receiveAddress)
+                                    << LOG_KV("data", toHexStringWithPrefix(allCallParameters.at(id)->data));
+                try
+                {
+                    auto output = executive->start(std::move(allCallParameters.at(id)));
+
+                    executionResults[index] = toExecutionResult(*executive, std::move(output));
+                }
+                catch (std::exception& e)
+                {
+                    EXECUTOR_LOG(ERROR) << "Execute error: " << boost::diagnostic_information(e);
+                }
             }
         });
 
-    auto parallelTimeOut = utcSteadyTime() + 30000;  // 30 timeout
     try
     {
-        std::atomic<bool> isWarnedTimeout(false);
-        tbb::parallel_for(tbb::blocked_range<unsigned int>(0, m_DAGThreadNum),
-            [&](const tbb::blocked_range<unsigned int>& _r) {
-                (void)_r;
-
-                while (!txDag->hasFinished())
-                {
-                    if (!isWarnedTimeout.load() && utcSteadyTime() >= parallelTimeOut)
-                    {
-                        isWarnedTimeout.store(true);
-                        EXECUTOR_LOG(WARNING) << LOG_BADGE("executeBlock")
-                                              << LOG_DESC("Para execute block timeout")
-                                              // << LOG_KV("txNum", transactions->size())
-                                              << LOG_KV("blockNumber", m_blockContext->number());
-                    }
-                    txDag->executeUnit(allExecutives, allCallParameters, allIndex);
-                }
-            });
+        txDag->run(m_DAGThreadNum);
     }
     catch (exception& e)
     {
@@ -1634,34 +1623,35 @@ std::unique_ptr<CallParameters> TransactionExecutor::createCallParameters(
     return callParameters;
 }
 
-std::vector<std::string> TransactionExecutor::getTxCriticals(const CallParameters& params)
+CriticalFields<string>::CriticalFieldPtr getTxCriticals(const CallParameters& _params,
+    crypto::Hash::Ptr m_hashImpl _hashImpl, TransactionExecutive::Ptr _executive , bool _isWasm)     // temp code params
 {
-    if (params.create)
+    if (_params.create)
     {
         // Not to parallel contract creation transaction
-        return {};
+        return nullptr;
     }
 
     // temp executive
-    auto executive = createExecutive(m_blockContext, std::string(params.receiveAddress), 0, 0);
-    auto p = executive->getPrecompiled(params.receiveAddress);
+   // auto executive = createExecutive(m_blockContext, std::string(_params.receiveAddress), 0, 0);
+    auto p = _executive->getPrecompiled(_params.receiveAddress);
     if (p)
     {
         // Precompile transaction
         if (p->isParallelPrecompiled())
         {
-            auto ret = vector<string>(p->getParallelTag(ref(params.data), m_isWasm));
+            auto ret = vector<string>(p->getParallelTag(ref(_params.data), _isWasm));
             for (string& critical : ret)
             {
-                critical += params.receiveAddress;
+                critical += _params.receiveAddress;
             }
             return ret;
         }
-        return {};
+        return nullptr;
     }
-    uint32_t selector = precompiled::getParamFunc(ref(params.data));
+    uint32_t selector = precompiled::getParamFunc(ref(_params.data));
 
-    auto receiveAddress = params.receiveAddress;
+    auto receiveAddress = _params.receiveAddress;
     std::shared_ptr<precompiled::ParallelConfig> config = nullptr;
     // hit the cache, fetch ParallelConfig from the cache directly
     // Note: Only when initializing DAG, get ParallelConfig, will not get
@@ -1669,18 +1659,18 @@ std::vector<std::string> TransactionExecutor::getTxCriticals(const CallParameter
     // TODO: add parallel config cache
     // auto parallelKey = std::make_pair(string(receiveAddress), selector);
     auto parallelConfigPrecompiled =
-        std::make_shared<precompiled::ParallelConfigPrecompiled>(m_hashImpl);
+        std::make_shared<precompiled::ParallelConfigPrecompiled>(_hashImpl);
 
     EXECUTOR_LOG(TRACE) << LOG_DESC("[getTxCriticals] get parallel config")
                         << LOG_KV("receiveAddress", receiveAddress) << LOG_KV("selector", selector)
-                        << LOG_KV("sender", params.origin);
+                        << LOG_KV("sender", _params.origin);
 
     config = parallelConfigPrecompiled->getParallelConfig(
-        executive, receiveAddress, selector, params.origin);
+        _executive, receiveAddress, selector, _params.origin);
 
     if (config == nullptr)
     {
-        return {};
+        return nullptr;
     }
     // Testing code
     auto res = vector<string>();
@@ -1692,7 +1682,7 @@ std::vector<std::string> TransactionExecutor::getTxCriticals(const CallParameter
         EXECUTOR_LOG(DEBUG) << LOG_DESC("[getTxCriticals] parser function signature failed, ")
                             << LOG_KV("func signature", config->functionName);
 
-        return {};
+        return nullptr;
     }
 
     auto paramTypes = af.getParamsType();
@@ -1702,24 +1692,24 @@ std::vector<std::string> TransactionExecutor::getTxCriticals(const CallParameter
                             << LOG_KV("func signature", config->functionName)
                             << LOG_KV("func criticalSize", config->criticalSize);
 
-        return {};
+        return nullptr;
     }
 
     paramTypes.resize((size_t)config->criticalSize);
 
-    codec::abi::ContractABICodec abi(m_hashImpl);
-    isOk = abi.abiOutByFuncSelector(ref(params.data).getCroppedData(4), paramTypes, res);
+    codec::abi::ContractABICodec abi(_hashImpl);
+    isOk = abi.abiOutByFuncSelector(ref(_params.data).getCroppedData(4), paramTypes, res);
     if (!isOk)
     {
         EXECUTOR_LOG(DEBUG) << LOG_DESC("[getTxCriticals] abiout failed, ")
                             << LOG_KV("func signature", config->functionName);
 
-        return {};
+        return nullptr;
     }
 
     for (string& critical : res)
     {
-        critical += params.receiveAddress;
+        critical += _params.receiveAddress;
     }
 
     return res;

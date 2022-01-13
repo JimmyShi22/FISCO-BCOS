@@ -136,8 +136,6 @@ public:
     void getCode(std::string_view contract,
         std::function<void(bcos::Error::Ptr, bcos::bytes)> callback) override;
 
-    std::vector<std::string> getTxCriticals(const CallParameters& params);
-
 private:
     std::shared_ptr<BlockContext> createBlockContext(
         const protocol::BlockHeader::ConstPtr& currentHeader,
