@@ -47,9 +47,9 @@ public:
     virtual ~TxDAG() {}
 
     // Generate DAG according with given transactions
-    void init(size_t count, const std::vector<std::vector<std::string>>& _txsCriticals, ExecuteTxFunc const& _f) override;
+    void init(size_t count, const std::vector<std::vector<std::string>>& _txsCriticals, ExecuteTxFunc const& _f);
 
-    void run(unsigned int threadNum) override;
+    void run(unsigned int threadNum);
 
     // Called by thread
     // Has the DAG reach the end?

@@ -66,6 +66,7 @@ void TxDAG2::init(critical::CriticalFieldsInterface::Ptr _txsCriticals, ExecuteT
     auto onAllConflictHandler = [&](ID id) {
         // do nothing
         // ignore normal tx, only handle DAG tx, normal tx has been sent back to be executed by DMT
+        (void)id;
     };
 
     // parse criticals

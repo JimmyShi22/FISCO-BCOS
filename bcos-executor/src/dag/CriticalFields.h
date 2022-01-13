@@ -85,8 +85,11 @@ public:
     using CriticalField = std::vector<T>;
     using CriticalFieldPtr = std::shared_ptr<CriticalField>;
 
-    void push(CriticalFieldPtr _critical) { m_criticals.push_back(_critical); }
+    CriticalFields(size_t _size): m_criticals(std::vector<CriticalFieldPtr>(_size)) {}
+
     size_t size() override { return m_criticals.size(); }
+    void put(size_t _id, CriticalFieldPtr _criticalField) { m_criticals[_id] = _criticalField; }
+    CriticalFieldPtr get(size_t _id) { return m_criticals[_id];}
 
     void parse(OnConflictHandler const& _onConflict, OnFirstConflictHandler const& _onFirstConflict,
         OnEmptyConflictHandler const& _onEmptyConflict,
@@ -102,16 +105,16 @@ public:
             {
                 _onAllConflict(id);
             }
-            else if (criticals.empty())
+            else if (criticals->empty())
             {
                 _onEmptyConflict(id);
             }
-            else if (!criticals.empty())
+            else if (!criticals->empty())
             {
 
                 // Get conflict parent's id set
                 std::set<ID> pIds;
-                for (T const& c : criticals)
+                for (T const& c : *criticals)
                 {
                     ID pId = latestCriticals.get(c);
                     if (pId != INVALID_ID)
@@ -130,7 +133,7 @@ public:
                     }
                 }
 
-                for (T const& c : criticals)
+                for (T const& c : *criticals)
                 {
                     latestCriticals.update(c, id);
                 }
@@ -144,7 +147,7 @@ public:
 
 
 private:
-    std::vector<CriticalFieldPtr> m_criticals = std::vector<CriticalFieldPtr>();
+    std::vector<CriticalFieldPtr> m_criticals;
 };
 }
 }}

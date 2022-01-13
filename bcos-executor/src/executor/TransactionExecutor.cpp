@@ -270,6 +270,9 @@ void TransactionExecutor::dagExecuteTransactions(
     }
 }
 
+CriticalFields<string>::CriticalFieldPtr getTxCriticals(const CallParameters& _params,
+    crypto::Hash::Ptr _hashImpl, TransactionExecutive::Ptr _executive, bool _isWasm);
+
 void TransactionExecutor::dagExecuteTransactionsForEvm(gsl::span<CallParameters::UniquePtr> inputs,
     const bcos::crypto::HashList& txHashList,
     std::function<void(
@@ -280,15 +283,17 @@ void TransactionExecutor::dagExecuteTransactionsForEvm(gsl::span<CallParameters:
     vector<ExecutionMessage::UniquePtr> executionResults(transactionsNum);
 
     // get criticals
-    CriticalFields<string>::Ptr txsCriticals = make_shared<CriticalFields<string>>();
+    CriticalFields<string>::Ptr txsCriticals = make_shared<CriticalFields<string>>(transactionsNum);
 
     size_t serialTransactionsNum = 0;
     tbb::parallel_for(tbb::blocked_range<uint64_t>(0, transactionsNum),
         [&](const tbb::blocked_range<uint64_t>& range) {
             for (uint64_t i = range.begin(); i < range.end(); i++)
             {
-                txsCriticals[i] = getTxCriticals(*inputs[i]);
-                if (txsCriticals[i].empty())
+                auto executive = createExecutive(m_blockContext, std::string((*inputs[i]).receiveAddress), 0, 0);
+                CriticalFields<string>::CriticalFieldPtr criticals = getTxCriticals(*inputs[i], m_hashImpl, executive, m_isWasm);
+                txsCriticals->put(i, criticals);
+                if (criticals == nullptr)
                 {
                     serialTransactionsNum++;
                     executionResults[i] = toExecutionResult(std::move(inputs[i]));
@@ -309,7 +314,7 @@ void TransactionExecutor::dagExecuteTransactionsForEvm(gsl::span<CallParameters:
 
     for (gsl::index i = 0; i < transactionsNum; ++i)
     {
-        if (txsCriticals[i].empty())
+        if (txsCriticals->get(i) == nullptr)
         {
             continue;
         }
@@ -1624,7 +1629,8 @@ std::unique_ptr<CallParameters> TransactionExecutor::createCallParameters(
 }
 
 CriticalFields<string>::CriticalFieldPtr getTxCriticals(const CallParameters& _params,
-    crypto::Hash::Ptr m_hashImpl _hashImpl, TransactionExecutive::Ptr _executive , bool _isWasm)     // temp code params
+    // temp code params
+    crypto::Hash::Ptr _hashImpl, TransactionExecutive::Ptr _executive, bool _isWasm)
 {
     if (_params.create)
     {
@@ -1645,7 +1651,7 @@ CriticalFields<string>::CriticalFieldPtr getTxCriticals(const CallParameters& _p
             {
                 critical += _params.receiveAddress;
             }
-            return ret;
+            return make_shared<vector<string>>(std::move(ret));
         }
         return nullptr;
     }
@@ -1712,5 +1718,5 @@ CriticalFields<string>::CriticalFieldPtr getTxCriticals(const CallParameters& _p
         critical += _params.receiveAddress;
     }
 
-    return res;
+    return  make_shared<vector<string>>(std::move(res));;
 }

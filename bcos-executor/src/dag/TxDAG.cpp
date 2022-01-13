@@ -27,7 +27,7 @@
 using namespace std;
 using namespace bcos;
 using namespace bcos::executor;
-using namespace bcos::executor::critical
+using namespace bcos::executor::critical;
 
 #define DAG_LOG(LEVEL) BCOS_LOG(LEVEL) << LOG_BADGE("DAG")
 
@@ -49,7 +49,7 @@ void TxDAG::init(size_t count, const std::vector<std::vector<std::string>>& _txs
             // Get critical field
 
             // Add edge between critical transaction
-            std::set<CriticalFieldsRecorder<string>::ID> pIds;
+            std::set<ID> pIds;
             for (string const& c : criticals)
             {
                 ID pId = latestCriticals.get(c);
@@ -59,7 +59,7 @@ void TxDAG::init(size_t count, const std::vector<std::vector<std::string>>& _txs
                 }
             }
 
-            for(CriticalFieldsRecorder<string>::ID pId : pIds) {
+            for(ID pId : pIds) {
                 m_dag.addEdge(pId, id);
             }
 
