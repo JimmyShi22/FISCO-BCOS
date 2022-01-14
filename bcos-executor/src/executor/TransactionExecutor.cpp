@@ -307,53 +307,28 @@ void TransactionExecutor::dagExecuteTransactionsForEvm(gsl::span<CallParameters:
         });
 
 
-
-    vector<TransactionExecutive::Ptr> allExecutives(transactionsNum);
-    vector<std::unique_ptr<CallParameters>> allCallParameters(transactionsNum);
-    std::vector<gsl::index> allIndex(transactionsNum);
-
-    for (gsl::index i = 0; i < transactionsNum; ++i)
-    {
-        if (txsCriticals->get(i) == nullptr)
-        {
-            continue;
-        }
-
-        auto& input = inputs[i];
-        auto contextID = input->contextID;
-        auto seq = input->seq;
-
-        auto executive = createExecutive(m_blockContext, input->codeAddress, contextID, seq);
-
-        m_blockContext->insertExecutive(contextID, seq, {executive});
-
-        allExecutives[i].swap(executive);
-        allCallParameters[i].swap(input);
-        allIndex[i] = i;
-    }
-
+    // DAG run
     shared_ptr<TxDAGInterface> txDag = make_shared<TxDAG2>();
     txDag->init(txsCriticals,
-        [this, &executionResults, &allExecutives, &allCallParameters, &allIndex](ID id) {
-            if (allExecutives[id] && allCallParameters.at(id)) {
-                auto executive = allExecutives[id];
-                auto index = allIndex[id];
+        [this, &inputs, &executionResults](ID id) {
+
+            auto& input = inputs[id];
+            auto executive = createExecutive(m_blockContext, input->codeAddress, input->contextID, input->seq);
 
                 EXECUTOR_LOG(DEBUG) << LOG_BADGE("dagExecuteTransactionsForEvm")
                                     << LOG_DESC("Start transaction")
-                                    << LOG_KV("to", allCallParameters.at(id)->receiveAddress)
-                                    << LOG_KV("data", toHexStringWithPrefix(allCallParameters.at(id)->data));
+                                    << LOG_KV("to", input->receiveAddress)
+                                    << LOG_KV("data", toHexStringWithPrefix(input->data));
                 try
                 {
-                    auto output = executive->start(std::move(allCallParameters.at(id)));
+                    auto output = executive->start(std::move(input));
 
-                    executionResults[index] = toExecutionResult(*executive, std::move(output));
+                    executionResults[id] = toExecutionResult(*executive, std::move(output));
                 }
                 catch (std::exception& e)
                 {
                     EXECUTOR_LOG(ERROR) << "Execute error: " << boost::diagnostic_information(e);
                 }
-            }
         });
 
     try
@@ -1646,12 +1621,14 @@ CriticalFields<string>::CriticalFieldPtr getTxCriticals(const CallParameters& _p
         // Precompile transaction
         if (p->isParallelPrecompiled())
         {
-            auto ret = vector<string>(p->getParallelTag(ref(_params.data), _isWasm));
-            for (string& critical : ret)
+            auto criticals = vector<string>(p->getParallelTag(ref(_params.data), _isWasm));
+            vector<vector<string>> ret;
+            for (string& critical : criticals)
             {
                 critical += _params.receiveAddress;
+                ret.push_back({critical});
             }
-            return make_shared<vector<string>>(std::move(ret));
+            return make_shared<vector<vector<string>>>(std::move(ret));
         }
         return nullptr;
     }
@@ -1679,7 +1656,7 @@ CriticalFields<string>::CriticalFieldPtr getTxCriticals(const CallParameters& _p
         return nullptr;
     }
     // Testing code
-    auto res = vector<string>();
+    auto criticals = vector<string>();
 
     codec::abi::ABIFunc af;
     bool isOk = af.parser(config->functionName);
@@ -1704,7 +1681,7 @@ CriticalFields<string>::CriticalFieldPtr getTxCriticals(const CallParameters& _p
     paramTypes.resize((size_t)config->criticalSize);
 
     codec::abi::ContractABICodec abi(_hashImpl);
-    isOk = abi.abiOutByFuncSelector(ref(_params.data).getCroppedData(4), paramTypes, res);
+    isOk = abi.abiOutByFuncSelector(ref(_params.data).getCroppedData(4), paramTypes, criticals);
     if (!isOk)
     {
         EXECUTOR_LOG(DEBUG) << LOG_DESC("[getTxCriticals] abiout failed, ")
@@ -1713,10 +1690,11 @@ CriticalFields<string>::CriticalFieldPtr getTxCriticals(const CallParameters& _p
         return nullptr;
     }
 
-    for (string& critical : res)
+    vector<vector<string>> ret;
+    for (string& critical : criticals)
     {
         critical += _params.receiveAddress;
+        ret.push_back({critical});
     }
-
-    return  make_shared<vector<string>>(std::move(res));;
+    return make_shared<vector<vector<string>>>(std::move(ret));
 }

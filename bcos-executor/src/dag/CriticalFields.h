@@ -7,7 +7,7 @@
 #pragma once
 #include <map>
 #include <functional>
-
+#include "Trie.h"
 
 namespace bcos
 {
@@ -38,45 +38,19 @@ public:
         OnAllConflictHandler const& _onAllConflict) = 0;
 };
 
-
-template <typename T>
-class CriticalFieldsRecorder
-{
+template<typename T>
+class LatestCriticalFields {
 public:
-    ID get(T const& _c)
-    {
-        auto it = m_criticals.find(_c);
-        if (it == m_criticals.end())
-        {
-            if (m_criticalAll != INVALID_ID)
-                return m_criticalAll;
-            return INVALID_ID;
-        }
-        return it->second;
+    std::vector<ID> get(std::vector<T> const& _c) {
+        return m_trie.get(_c);
     }
 
-    void update(T const& _c, ID _txId) { m_criticals[_c] = _txId; }
-
-    void foreachField(std::function<void(ID)> _f)
-    {
-        for (auto const& _fieldAndId : m_criticals)
-        {
-            _f(_fieldAndId.second);
-        }
-
-        if (m_criticalAll != INVALID_ID)
-            _f(m_criticalAll);
-    }
-
-    void setCriticalAll(ID _id)
-    {
-        m_criticalAll = _id;
-        m_criticals.clear();
+    void update(std::vector<T> const& _c, ID _txId) {
+        m_trie.set(_c, _txId);
     }
 
 private:
-    std::map<T, ID> m_criticals;
-    ID m_criticalAll = INVALID_ID;
+    Trie<T, ID> m_trie;
 };
 
 template <typename T>
@@ -84,7 +58,7 @@ class CriticalFields : public virtual CriticalFieldsInterface
 {
 public:
     using Ptr = std::shared_ptr<CriticalFields>;
-    using CriticalField = std::vector<T>;
+    using CriticalField = std::vector<std::vector<T>>;
     using CriticalFieldPtr = std::shared_ptr<CriticalField>;
 
     CriticalFields(size_t _size): m_criticals(std::vector<CriticalFieldPtr>(_size)) {}
@@ -98,7 +72,7 @@ public:
         OnEmptyConflictHandler const& _onEmptyConflict,
         OnAllConflictHandler const& _onAllConflict) override
     {
-        CriticalFieldsRecorder<T> latestCriticals;
+        LatestCriticalFields<T> latestCriticals;
 
         for (ID id = 0; id < m_criticals.size(); ++id)
         {
@@ -119,8 +93,7 @@ public:
                 std::set<ID> pIds;
                 for (T const& c : *criticals)
                 {
-                    ID pId = latestCriticals.get(c);
-                    if (pId != INVALID_ID)
+                    for(auto pId : latestCriticals.get(c))
                     {
                         pIds.insert(pId);
                     }
