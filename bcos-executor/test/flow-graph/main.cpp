@@ -19,7 +19,8 @@ CriticalFieldsInterface::Ptr makeCriticals(int _totalTx) {
     for(int i = 0; i < _totalTx; i++){
         int rand1 = random() % originMap.size();
         int rand2 = random() % originMap.size();
-        criticals->put(i, make_shared<CriticalFields<string>::CriticalField>(std::move(originMap[rand1] + originMap[rand2])));
+        vector<vector<string>> critical = { {originMap[rand1]} , {originMap[rand2]} };
+        criticals->put(i, make_shared<CriticalFields<string>::CriticalField>(std::move(critical)));
         /*
         stringstream ss;
         ss << i;

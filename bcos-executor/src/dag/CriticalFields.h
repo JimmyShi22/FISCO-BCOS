@@ -91,7 +91,7 @@ public:
 
                 // Get conflict parent's id set
                 std::set<ID> pIds;
-                for (T const& c : *criticals)
+                for (auto const& c : *criticals)
                 {
                     for(auto pId : latestCriticals.get(c))
                     {
@@ -109,7 +109,7 @@ public:
                     }
                 }
 
-                for (T const& c : *criticals)
+                for (auto const& c : *criticals)
                 {
                     latestCriticals.update(c, id);
                 }
