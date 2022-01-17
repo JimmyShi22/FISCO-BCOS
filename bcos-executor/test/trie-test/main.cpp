@@ -1,4 +1,4 @@
-#include "../../src/dag/Trie.h"
+#include "../../src/dag/TrieSet.h"
 #include <vector>
 #include <iostream>
 #include <cstdlib>
@@ -7,7 +7,7 @@ using namespace std;
 using namespace bcos::executor;
 
 int main() {
-    Trie<string, int> trie;
+    TrieSet<string, int> trie;
 
     vector<string> root = {"1", "2"};
     //vector<string> root = {"1", "2", "8"};
@@ -31,7 +31,7 @@ int main() {
 }
 
 int main1() {
-    Trie<string, int> trie;
+    TrieSet<string, int> trie;
 
     vector<string> root = {"1", "2"};
 
@@ -54,7 +54,7 @@ int main1() {
 }
 
 int main2() {
-    Trie<int, int> trie;
+    TrieSet<int, int> trie;
 
     vector<int> root = {};
 

@@ -7,7 +7,7 @@
 #pragma once
 #include <map>
 #include <functional>
-#include "Trie.h"
+#include "TrieSet.h"
 
 namespace bcos
 {
@@ -50,7 +50,7 @@ public:
     }
 
 private:
-    Trie<T, ID> m_trie;
+    TrieSet<T, ID> m_trie;
 };
 
 template <typename T>

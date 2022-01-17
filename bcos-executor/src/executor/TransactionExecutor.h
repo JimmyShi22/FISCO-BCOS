@@ -79,8 +79,6 @@ struct CallParameters;
 using executionCallback = std::function<void(
     const Error::ConstPtr&, std::vector<protocol::ExecutionMessage::UniquePtr>&)>;
 
-using ConflictFields = std::vector<bytes>;
-
 class TransactionExecutor : public ParallelTransactionExecutorInterface,
                             public std::enable_shared_from_this<TransactionExecutor>
 {
@@ -165,9 +163,6 @@ private:
 
     std::unique_ptr<CallParameters> createCallParameters(
         bcos::protocol::ExecutionMessage& input, const bcos::protocol::Transaction& tx);
-
-    std::optional<std::vector<bcos::bytes>> decodeConflictFields(
-        const FunctionAbi& functionAbi, const CallParameters& prams);
 
     std::function<void(
         const TransactionExecutive& executive, std::unique_ptr<CallParameters> input)>

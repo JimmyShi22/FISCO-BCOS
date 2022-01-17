@@ -103,14 +103,15 @@ public:
 };
 
 template <typename K, typename V>
-class Trie {
+class TrieSet
+{
 public:
-    // set a value into a path's leaf
+    // set a value into a path 
     void set(std::vector<K> const& _path,V _value) {
         m_root.set(_path, 0, _value);
     }
 
-    // get all values whose path have _path prefix
+    // get all values under a path which has the same prefix _path
     std::vector<V> get(std::vector<K> const& _path) {
         return m_root.get(_path, 0);
     }
