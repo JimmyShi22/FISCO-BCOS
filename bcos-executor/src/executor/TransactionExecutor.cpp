@@ -407,7 +407,11 @@ void TransactionExecutor::dagExecuteTransactionsForWasm(
                     else
                     {
                         auto storage = m_blockContext->storage();
-                        auto tableName = "/apps/" + string(to);
+
+                        string addressLower(to);
+                        boost::algorithm::to_lower(addressLower);
+                        auto tableName = "/apps/" + string(addressLower);
+
                         auto table = storage->openTable(tableName);
                         if(!table.has_value()) {
                             executionResults[i] = toExecutionResult(std::move(inputs[i]));
