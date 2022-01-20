@@ -26,7 +26,7 @@
 #include "bcos-protocol/testutils/protocol/FakeBlockHeader.h"
 #include "executive/BlockContext.h"
 #include "executive/TransactionExecutive.h"
-#include "executor/TransactionExecutor.h"
+#include "executor/TransactionExecutorFactory.h"
 #include "mock/MockTransactionalStorage.h"
 #include "mock/MockTxPool.h"
 #include "precompiled/Utilities.h"
@@ -80,7 +80,7 @@ public:
         header->setNumber(1);
 
         auto executionResultFactory = std::make_shared<NativeExecutionMessageFactory>();
-        executor = std::make_shared<TransactionExecutor>(
+        executor = bcos::executor::TransactionExecutorFactory::build(
             txpool, nullptr, storage, executionResultFactory, hashImpl, _isWasm, _isCheckAuth);
         createSysTable();
         codec = std::make_shared<PrecompiledCodec>(hashImpl, _isWasm);
@@ -108,7 +108,7 @@ public:
         header->setNumber(1);
 
         auto executionResultFactory = std::make_shared<NativeExecutionMessageFactory>();
-        executor = std::make_shared<TransactionExecutor>(
+        executor = bcos::executor::TransactionExecutorFactory::build(
             txpool, nullptr, storage, executionResultFactory, smHashImpl, _isWasm, false);
         createSysTable();
         codec = std::make_shared<PrecompiledCodec>(smHashImpl, _isWasm);
