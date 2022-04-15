@@ -67,6 +67,7 @@ public:
         case REVERT:
             return "REVERT";
         }
+        return "none";
     }
 
     std::string toString()
