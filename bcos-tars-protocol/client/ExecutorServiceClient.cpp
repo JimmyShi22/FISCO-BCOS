@@ -52,7 +52,8 @@ void ExecutorServiceClient::nextBlockHeader(int64_t schedulerTermId,
     };
     auto blockHeaderImpl =
         std::dynamic_pointer_cast<const bcostars::protocol::BlockHeaderImpl>(blockHeader);
-    m_prx->async_nextBlockHeader(new Callback(std::move(callback)), blockHeaderImpl->inner());
+    m_prx->async_nextBlockHeader(
+        new Callback(std::move(callback)), schedulerTermId, blockHeaderImpl->inner());
 }
 
 void ExecutorServiceClient::executeTransaction(bcos::protocol::ExecutionMessage::UniquePtr input,

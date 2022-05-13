@@ -1189,9 +1189,6 @@ PBFTMessageList PBFTCacheProcessor::preCommitCachesWithoutData()
                 it = m_caches.erase(it);
                 continue;
             }
-            PBFT_LOG(INFO) << LOG_DESC("#### preCommitCachesWithoutData")
-                           << LOG_KV("index", precommitCache->index())
-                           << LOG_KV("hash", precommitCache->hash().abridged());
             precommitCacheList.push_back(precommitCache);
         }
         it++;
@@ -1210,4 +1207,5 @@ void PBFTCacheProcessor::resetUnCommittedCacheState(bcos::protocol::BlockNumber 
             it.second->resetState();
         }
     }
+    m_executingProposals.clear();
 }
