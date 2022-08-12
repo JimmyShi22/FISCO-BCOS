@@ -105,7 +105,7 @@ macro(configure_project)
     elseif(ALLOCATOR STREQUAL "mimalloc")
         list(APPEND VCPKG_MANIFEST_FEATURES "mimalloc")
     else()
-        set(ALLOCATOR "default")
+        set(ALLOCATOR "tcmalloc")
     endif()
 
     if (NOT DEFINED VERSION_SUFFIX)
