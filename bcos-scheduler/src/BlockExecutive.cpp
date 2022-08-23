@@ -1346,6 +1346,12 @@ DmcExecutor::Ptr BlockExecutive::registerAndGetDmcExecutor(std::string contractA
         auto executor = m_scheduler->executorManager()->dispatchExecutor(contractAddress);
         auto executorInfo = m_scheduler->executorManager()->getExecutorInfo(contractAddress);
 
+        if (executor == nullptr || executorInfo == nullptr)
+        {
+            BOOST_THROW_EXCEPTION(BCOS_ERROR(
+                SchedulerError::ExecutorNotEstablishedError, "The executor has not started!"));
+        }
+
         if (!m_dmcRecorder)
         {
             m_dmcRecorder = std::make_shared<DmcStepRecorder>();
