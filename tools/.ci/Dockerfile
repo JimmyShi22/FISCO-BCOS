@@ -25,7 +25,9 @@ ENV VCPKG_FORCE_SYSTEM_BINARIES=1
 
 RUN git clone https://github.com/FISCO-BCOS/FISCO-BCOS.git --recursive --depth=1 -b ${SOURCE} \
     && mkdir -p FISCO-BCOS/build && cd FISCO-BCOS/build \
-    && set -e && cmake .. && cat /FISCO-BCOS/build/vcpkg-bootstrap.log && make -j2 && strip fisco-bcos-air/fisco-bcos
+    && set -e && cmake .. && make -j2 && strip fisco-bcos-air/fisco-bcos
+
+RUN cat /FISCO-BCOS/build/*.log
 
 FROM ubuntu:20.04
 LABEL maintainer service@fisco.com.cn
