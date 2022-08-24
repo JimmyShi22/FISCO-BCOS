@@ -21,10 +21,9 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Check cargo is visible
 RUN cargo --help
 
+ENV VCPKG_FORCE_SYSTEM_BINARIES=1
 
-
-RUN export VCPKG_FORCE_SYSTEM_BINARIES=1 \
-    && git clone https://github.com/FISCO-BCOS/FISCO-BCOS.git --recursive --depth=1 -b ${SOURCE} \
+RUN git clone https://github.com/FISCO-BCOS/FISCO-BCOS.git --recursive --depth=1 -b ${SOURCE} \
     && mkdir -p FISCO-BCOS/build && cd FISCO-BCOS/build \
     && cmake ..  && make -j2 && strip fisco-bcos-air/fisco-bcos
 
