@@ -23,9 +23,9 @@ RUN cargo --help
 
 ENV VCPKG_FORCE_SYSTEM_BINARIES=1
 
-RUN trap "cat /FISCO-BCOS/build/*.log" 1 &&  git clone https://github.com/FISCO-BCOS/FISCO-BCOS.git --recursive --depth=1 -b ${SOURCE} \
+RUN git clone https://github.com/FISCO-BCOS/FISCO-BCOS.git --recursive --depth=1 -b ${SOURCE} \
     && mkdir -p FISCO-BCOS/build && cd FISCO-BCOS/build \
-    && set -e && cmake .. && make -j2 && strip fisco-bcos-air/fisco-bcos
+    && cmake .. && make -j2 && strip fisco-bcos-air/fisco-bcos || cat /FISCO-BCOS/build/*.log
 
 
 FROM ubuntu:20.04
