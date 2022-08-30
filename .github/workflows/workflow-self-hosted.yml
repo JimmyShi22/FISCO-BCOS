@@ -40,7 +40,7 @@ jobs:
             centos-notest-${{ matrix.os }}-
       - name: Prepare centos tools
         run: |
-          set -e
+          sudo yum -y update
           sudo yum install -y epel-release centos-release-scl flex bison patch gmp-static
           sudo yum install -y devtoolset-10 devtoolset-11 llvm-toolset-7 rh-perl530-perl cmake3 zlib-devel ccache lcov python-devel python3-devel
           sudo yum install -y https://packages.endpointdev.com/rhel/7/os/x86_64/endpoint-repo.x86_64.rpm
@@ -64,7 +64,7 @@ jobs:
           mkdir -p build
           cd build
           cmake3 -DCMAKE_BUILD_TYPE=Release -DTESTS=ON -DWITH_LIGHTNODE=OFF -DWITH_CPPSDK=OFF -DWITH_TARS_SERVICES=ON -D${{ matrix.tikv }} -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake ../ || cat *.log
-          cmake3 --build . --parallel 3
+          cmake3 --build . --parallel 16
       - name: Test with tikv
         if: matrix.tikv == 'WITH_TIKV=ON'
         run: |
