@@ -17,6 +17,7 @@ jobs:
   build_centos:
     name: build_centos
     runs-on: self-hosted
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
