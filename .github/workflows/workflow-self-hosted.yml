@@ -62,7 +62,7 @@ jobs:
           . /opt/rh/llvm-toolset-7/enable
           mkdir -p build
           cd build
-          cmake3 -DCMAKE_BUILD_TYPE=Release -DTESTS=ON -DWITH_LIGHTNODE=OFF -DWITH_CPPSDK=OFF -DWITH_TARS_SERVICES=ON -D${{ matrix.tikv }} -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake ../
+          cmake3 -DCMAKE_BUILD_TYPE=Release -DTESTS=ON -DWITH_LIGHTNODE=OFF -DWITH_CPPSDK=OFF -DWITH_TARS_SERVICES=ON -D${{ matrix.tikv }} -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake ../ || cat *.log
           cmake3 --build . --parallel 3
       - name: Test with tikv
         if: matrix.tikv == 'WITH_TIKV=ON'
