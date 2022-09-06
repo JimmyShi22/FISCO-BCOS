@@ -200,7 +200,7 @@ jobs:
           make -j4
           make tar
       - name: tar fisco-bcos for CentOS
-        run:  mkdir bin && mv fisco-bcos-air/fisco-bcos bin && cd bin && tar -cvzf fisco-bcos-relwithdebinfo.tar.gz fisco-bcos
+        run:  mkdir -p bin && mv fisco-bcos-air/fisco-bcos bin && cd bin && tar -cvzf fisco-bcos-relwithdebinfo.tar.gz fisco-bcos
       - name: Upload fisco-bcos binaries to release
         uses: svenstaro/upload-release-action@v1-release
         with:
