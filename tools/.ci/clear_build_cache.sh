@@ -63,8 +63,8 @@ function check_file_and_clear_cache() {
     fi
 }
 
-# Fisrt: check file change
-# check_file_and_clear_cache CMake ${BUILD_DIR}
+# First: check file change
+check_file_and_clear_cache CMake ${BUILD_DIR}
 
 # Second: check dir change
 check_and_clear_cache .github/workflows ${BUILD_DIR}
