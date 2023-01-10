@@ -986,8 +986,7 @@ void BlockExecutive::DMCExecute(
     {
         DMC_LOG(WARNING) << "DMCExecute exception: " << LOG_KV("code", e.errorCode())
                          << LOG_KV("message", e.errorMessage());
-        callback(
-            BCOS_ERROR_UNIQUE_PTR(e.errorCode(), e.errorMessage()), nullptr, m_isSysBlock);
+        callback(BCOS_ERROR_UNIQUE_PTR(e.errorCode(), e.errorMessage()), nullptr, m_isSysBlock);
     }
     catch (std::exception& e)
     {
@@ -1453,6 +1452,15 @@ void BlockExecutive::batchBlockRollback(
 }
 
 
+DmcExecutor::Ptr BlockExecutive::buildDmcExecutor(const std::string& name,
+    const std::string& contractAddress,
+    bcos::executor::ParallelTransactionExecutorInterface::Ptr executor)
+{
+    auto dmcExecutor = std::make_shared<DmcExecutor>(name, contractAddress, m_block, executor,
+        m_keyLocks, m_scheduler->m_hashImpl, m_dmcRecorder);
+    return dmcExecutor;
+}
+
 DmcExecutor::Ptr BlockExecutive::registerAndGetDmcExecutor(std::string contractAddress)
 {
     {
@@ -1495,8 +1503,7 @@ DmcExecutor::Ptr BlockExecutive::registerAndGetDmcExecutor(std::string contractA
             m_dmcRecorder = std::make_shared<DmcStepRecorder>();
         }
 
-        auto dmcExecutor = std::make_shared<DmcExecutor>(executorInfo->name, contractAddress,
-            m_block, executor, m_keyLocks, m_scheduler->m_hashImpl, m_dmcRecorder);
+        auto dmcExecutor = buildDmcExecutor(executorInfo->name, contractAddress, executor);
         m_dmcExecutors.emplace(contractAddress, dmcExecutor);
 
         // register functions
@@ -1673,4 +1680,9 @@ std::string BlockExecutive::preprocessAddress(const std::string_view& address)
 
     // boost::to_lower(out); no need to be lower
     return out;
+}
+
+bcos::storage::TransactionalStorageInterface::Ptr BlockExecutive::getStorage()
+{
+    return m_scheduler->m_storage;
 }

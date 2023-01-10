@@ -19,8 +19,9 @@
  * @date: 2023-01-07
  */
 
-#include "../executive/ExecutiveDagFlow.h"
 #include "ShardingTransactionExecutor.h"
+#include "../executive/ExecutiveDagFlow.h"
+#include "../executive/ExecutiveFactory.h"
 
 using namespace bcos::executor;
 
@@ -52,8 +53,9 @@ std::shared_ptr<ExecutiveFlowInterface> ShardingTransactionExecutor::getExecutiv
         ExecutiveFlowInterface::Ptr executiveFlow = blockContext->getExecutiveFlow(codeAddress);
         if (executiveFlow == nullptr)
         {
-            auto executiveFactory = std::make_shared<ExecutiveFactory>(blockContext,
+            auto executiveFactory = std::make_shared<ShardingExecutiveFactory>(blockContext,
                 m_precompiledContract, m_constantPrecompiled, m_builtInPrecompiled, m_gasInjector);
+
 
             executiveFlow = std::make_shared<ExecutiveDagFlow>(executiveFactory);
             executiveFlow->setThreadPool(m_threadPool);
