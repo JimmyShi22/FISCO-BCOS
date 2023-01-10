@@ -32,16 +32,11 @@ using namespace bcos::executor;
 using namespace bcos::precompiled;
 
 
-std::shared_ptr<TransactionExecutive> ExecutiveFactory::build(const std::string& _contractAddress,
-    int64_t contextID, int64_t seq, bool useCoroutine, bool isSharding)
+std::shared_ptr<TransactionExecutive> ExecutiveFactory::build(
+    const std::string& _contractAddress, int64_t contextID, int64_t seq, bool useCoroutine)
 {
     std::shared_ptr<TransactionExecutive> executive;
-    if (isSharding)
-    {
-        executive = std::make_shared<ShardingTransactionExecutive>(
-            m_blockContext, _contractAddress, contextID, seq, m_gasInjector);
-    }
-    else if (useCoroutine)
+    if (useCoroutine)
     {
         executive = std::make_shared<CoroutineTransactionExecutive>(
             m_blockContext, _contractAddress, contextID, seq, m_gasInjector);
@@ -51,13 +46,11 @@ std::shared_ptr<TransactionExecutive> ExecutiveFactory::build(const std::string&
         executive = std::make_shared<TransactionExecutive>(
             m_blockContext, _contractAddress, contextID, seq, m_gasInjector);
     }
-    executive->setConstantPrecompiled(m_constantPrecompiled);
-    executive->setEVMPrecompiled(m_precompiledContract);
-    executive->setBuiltInPrecompiled(m_builtInPrecompiled);
 
-    registerExtPrecompiled(executive);
+    setParams(executive);
     return executive;
 }
+
 void ExecutiveFactory::registerExtPrecompiled(std::shared_ptr<TransactionExecutive>& executive)
 {
     // Code below has moved to initEvmEnvironment & initWasmEnvironment in TransactionExecutor.cpp:
@@ -70,3 +63,23 @@ void ExecutiveFactory::registerExtPrecompiled(std::shared_ptr<TransactionExecuti
     // TODO: register User developed Precompiled contract
     // registerUserPrecompiled(context);
 }
+
+void ExecutiveFactory::setParams(std::shared_ptr<TransactionExecutive> executive)
+{
+    executive->setConstantPrecompiled(m_constantPrecompiled);
+    executive->setEVMPrecompiled(m_precompiledContract);
+    executive->setBuiltInPrecompiled(m_builtInPrecompiled);
+
+    registerExtPrecompiled(executive);
+}
+
+std::shared_ptr<TransactionExecutive> ShardingExecutiveFactory::build(
+    const std::string& _contractAddress, int64_t contextID, int64_t seq, bool useCoroutine)
+{
+    (void)useCoroutine;
+
+    auto executive = std::make_shared<ShardingTransactionExecutive>(
+        m_blockContext, _contractAddress, contextID, seq, m_gasInjector);
+    setParams(executive);
+    return executive;
+};
