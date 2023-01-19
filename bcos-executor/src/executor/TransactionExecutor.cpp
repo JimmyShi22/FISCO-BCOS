@@ -2291,8 +2291,19 @@ void TransactionExecutor::asyncExecute(std::shared_ptr<BlockContext> blockContex
 
                 auto callParameters = createCallParameters(*input, *tx);
 
-                ExecutiveFlowInterface::Ptr executiveFlow =
-                    getExecutiveFlow(blockContext, callParameters->receiveAddress, useCoroutine);
+                ExecutiveFlowInterface::Ptr executiveFlow;
+
+                if (input->staticCall())
+                {
+                    executiveFlow = TransactionExecutor::getExecutiveFlow(
+                        blockContext, callParameters->receiveAddress, useCoroutine);
+                }
+                else
+                {
+                    executiveFlow = getExecutiveFlow(
+                        blockContext, callParameters->receiveAddress, useCoroutine);
+                }
+
                 executiveFlow->submit(std::move(callParameters));
 
                 asyncExecuteExecutiveFlow(executiveFlow,

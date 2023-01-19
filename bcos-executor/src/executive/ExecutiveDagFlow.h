@@ -21,21 +21,63 @@
 
 #pragma once
 
-#include "ExecutiveStackFlow.h"
+
+#include "ExecutiveFactory.h"
+#include "ExecutiveFlowInterface.h"
+#include "ExecutiveState.h"
 namespace bcos::executor
 {
 
-class ExecutiveDagFlow : public ExecutiveStackFlow
+class ExecutiveDagFlow : public virtual ExecutiveFlowInterface,
+                         public std::enable_shared_from_this<ExecutiveDagFlow>
 {
 public:
     using Ptr = std::shared_ptr<ExecutiveDagFlow>;
 
-    ExecutiveDagFlow(ExecutiveFactory::Ptr executiveFactory) : ExecutiveStackFlow(executiveFactory)
+    ExecutiveDagFlow(ExecutiveFactory::Ptr executiveFactory) : m_executiveFactory(executiveFactory)
     {}
-    ~ExecutiveDagFlow() override = default;
+    virtual ~ExecutiveDagFlow() = default;
 
-    // std::shared_ptr<TransactionExecutive> buildExecutive(CallParameters::UniquePtr& input)
-    // override;
+    void submit(CallParameters::UniquePtr txInput) override;
+    void submit(std::shared_ptr<std::vector<CallParameters::UniquePtr>> txInputs) override;
+
+    void asyncRun(
+        // onTxReturn(output)
+        std::function<void(CallParameters::UniquePtr)> onTxReturn,
+
+        // onFinished(success, errorMessage)
+        std::function<void(bcos::Error::UniquePtr)> onFinished) override;
+
+    void stop() override
+    {
+        EXECUTOR_LOG(DEBUG) << "Try to stop ExecutiveDagFlow";
+        if (!m_isRunning)
+        {
+            EXECUTOR_LOG(DEBUG) << "Executor has tried to stop";
+            return;
+        }
+
+        m_isRunning = false;
+        ExecutiveFlowInterface::stop();
+    };
+
+protected:
+    void run(std::function<void(CallParameters::UniquePtr)> onTxReturn,
+        std::function<void(bcos::Error::UniquePtr)> onFinished);
+
+    template <class F>
+    void asyncTo(F f)
+    {
+        // call super function
+        ExecutiveFlowInterface::asyncTo<F>(std::move(f));
+    }
+
+    std::map<int64_t, CallParameters::UniquePtr, std::less<>> m_inputs;
+    ExecutiveState::Ptr m_pausedExecutive;
+
+    ExecutiveFactory::Ptr m_executiveFactory;
+    mutable bcos::RecursiveMutex x_lock;
+    bool m_isRunning = true;
 };
 
 
