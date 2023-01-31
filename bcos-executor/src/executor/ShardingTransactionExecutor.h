@@ -26,8 +26,8 @@ class ShardingTransactionExecutor : public TransactionExecutor
 {
 public:
     using Ptr = std::shared_ptr<ShardingTransactionExecutor>;
-    ShardingTransactionExecutor(bcos::ledger::LedgerInterface::Ptr ledger, txpool::TxPoolInterface::Ptr txpool,
-        storage::MergeableStorageInterface::Ptr cachedStorage,
+    ShardingTransactionExecutor(bcos::ledger::LedgerInterface::Ptr ledger,
+        txpool::TxPoolInterface::Ptr txpool, storage::MergeableStorageInterface::Ptr cachedStorage,
         storage::TransactionalStorageInterface::Ptr backendStorage,
         protocol::ExecutionMessageFactory::Ptr executionMessageFactory,
         bcos::crypto::Hash::Ptr hashImpl, bool isWasm, bool isAuthCheck, size_t keyPageSize,
@@ -44,7 +44,7 @@ public:
             callback) override;
 
     std::shared_ptr<ExecutiveFlowInterface> getExecutiveFlow(
-        std::shared_ptr<BlockContext> blockContext, std::string codeAddress,
-        bool useCoroutine) override;
+        std::shared_ptr<BlockContext> blockContext, std::string codeAddress, bool useCoroutine,
+        bool isStaticCall = false) override;
 };
 }  // namespace bcos::executor

@@ -44,7 +44,8 @@ void ShardingTransactionExecutor::executeTransactions(std::string contractAddres
 }
 
 std::shared_ptr<ExecutiveFlowInterface> ShardingTransactionExecutor::getExecutiveFlow(
-    std::shared_ptr<BlockContext> blockContext, std::string codeAddress, bool useCoroutine)
+    std::shared_ptr<BlockContext> blockContext, std::string codeAddress, bool useCoroutine,
+    bool isStaticCall)
 {
     if (m_blockVersion >= uint32_t(bcos::protocol::BlockVersion::V3_3_VERSION))
     {
@@ -53,18 +54,29 @@ std::shared_ptr<ExecutiveFlowInterface> ShardingTransactionExecutor::getExecutiv
         ExecutiveFlowInterface::Ptr executiveFlow = blockContext->getExecutiveFlow(codeAddress);
         if (executiveFlow == nullptr)
         {
-            auto executiveFactory = std::make_shared<ShardingExecutiveFactory>(blockContext,
-                m_precompiledContract, m_constantPrecompiled, m_builtInPrecompiled, m_gasInjector);
+            if (!isStaticCall)
+            {
+                auto executiveFactory =
+                    std::make_shared<ShardingExecutiveFactory>(blockContext, m_precompiledContract,
+                        m_constantPrecompiled, m_builtInPrecompiled, m_gasInjector);
 
 
-            executiveFlow = std::make_shared<ExecutiveDagFlow>(executiveFactory);
-            executiveFlow->setThreadPool(m_threadPool);
-            blockContext->setExecutiveFlow(codeAddress, executiveFlow);
+                executiveFlow = std::make_shared<ExecutiveDagFlow>(executiveFactory);
+                executiveFlow->setThreadPool(m_threadPool);
+                blockContext->setExecutiveFlow(codeAddress, executiveFlow);
+            }
+            else
+            {
+                // use serial to call
+                executiveFlow = TransactionExecutor::getExecutiveFlow(
+                    blockContext, codeAddress, false, isStaticCall);
+            }
         }
         return executiveFlow;
     }
     else
     {
-        return TransactionExecutor::getExecutiveFlow(blockContext, codeAddress, useCoroutine);
+        return TransactionExecutor::getExecutiveFlow(
+            blockContext, codeAddress, useCoroutine, isStaticCall);
     }
 }

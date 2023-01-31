@@ -2164,7 +2164,8 @@ void TransactionExecutor::getABI(
 }
 
 ExecutiveFlowInterface::Ptr TransactionExecutor::getExecutiveFlow(
-    std::shared_ptr<BlockContext> blockContext, std::string codeAddress, bool useCoroutine)
+    std::shared_ptr<BlockContext> blockContext, std::string codeAddress, bool useCoroutine,
+    bool isStaticCall)
 {
     EXECUTOR_NAME_LOG(DEBUG) << "getExecutiveFlow" << LOG_KV("codeAddress", codeAddress);
     bcos::RecursiveGuard lock(x_executiveFlowLock);
@@ -2293,16 +2294,8 @@ void TransactionExecutor::asyncExecute(std::shared_ptr<BlockContext> blockContex
 
                 ExecutiveFlowInterface::Ptr executiveFlow;
 
-                if (input->staticCall())
-                {
-                    executiveFlow = TransactionExecutor::getExecutiveFlow(
-                        blockContext, callParameters->receiveAddress, useCoroutine);
-                }
-                else
-                {
-                    executiveFlow = getExecutiveFlow(
-                        blockContext, callParameters->receiveAddress, useCoroutine);
-                }
+                executiveFlow = getExecutiveFlow(blockContext, callParameters->receiveAddress,
+                    useCoroutine, input->staticCall());
 
                 executiveFlow->submit(std::move(callParameters));
 
@@ -2340,8 +2333,8 @@ void TransactionExecutor::asyncExecute(std::shared_ptr<BlockContext> blockContex
     case bcos::protocol::ExecutionMessage::KEY_LOCK:
     {
         auto callParameters = createCallParameters(*input, input->staticCall());
-        ExecutiveFlowInterface::Ptr executiveFlow =
-            getExecutiveFlow(blockContext, callParameters->receiveAddress, useCoroutine);
+        ExecutiveFlowInterface::Ptr executiveFlow = getExecutiveFlow(
+            blockContext, callParameters->receiveAddress, useCoroutine, input->staticCall());
         executiveFlow->submit(std::move(callParameters));
         asyncExecuteExecutiveFlow(executiveFlow,
             [this, callback = std::move(callback)](bcos::Error::UniquePtr&& error,
