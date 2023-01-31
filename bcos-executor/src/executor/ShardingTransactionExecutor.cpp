@@ -61,7 +61,7 @@ std::shared_ptr<ExecutiveFlowInterface> ShardingTransactionExecutor::getExecutiv
                         m_constantPrecompiled, m_builtInPrecompiled, m_gasInjector);
 
 
-                executiveFlow = std::make_shared<ExecutiveDagFlow>(executiveFactory);
+                executiveFlow = std::make_shared<ExecutiveDagFlow>(executiveFactory, m_abiCache);
                 executiveFlow->setThreadPool(m_threadPool);
                 blockContext->setExecutiveFlow(codeAddress, executiveFlow);
             }

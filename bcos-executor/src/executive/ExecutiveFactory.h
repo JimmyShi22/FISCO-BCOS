@@ -60,6 +60,7 @@ public:
     virtual ~ExecutiveFactory() = default;
     virtual std::shared_ptr<TransactionExecutive> build(const std::string& _contractAddress,
         int64_t contextID, int64_t seq, bool useCoroutine = true);
+    std::weak_ptr<BlockContext> getBlockContext() { return m_blockContext; };
 
 protected:
     void setParams(std::shared_ptr<TransactionExecutive> executive);

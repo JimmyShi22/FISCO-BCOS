@@ -76,10 +76,18 @@ void ExecutiveFactory::setParams(std::shared_ptr<TransactionExecutive> executive
 std::shared_ptr<TransactionExecutive> ShardingExecutiveFactory::build(
     const std::string& _contractAddress, int64_t contextID, int64_t seq, bool useCoroutine)
 {
-    (void)useCoroutine;
-
-    auto executive = std::make_shared<ShardingTransactionExecutive>(
-        m_blockContext, _contractAddress, contextID, seq, m_gasInjector);
-    setParams(executive);
-    return executive;
+    if (useCoroutine)
+    {
+        auto executive = std::make_shared<ShardingTransactionExecutive>(
+            m_blockContext, _contractAddress, contextID, seq, m_gasInjector);
+        setParams(executive);
+        return executive;
+    }
+    else
+    {
+        auto executive = std::make_shared<TransactionExecutive>(
+            m_blockContext, _contractAddress, contextID, seq, m_gasInjector);
+        setParams(executive);
+        return executive;
+    }
 };

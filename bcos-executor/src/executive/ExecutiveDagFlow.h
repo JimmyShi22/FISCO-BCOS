@@ -22,11 +22,16 @@
 #pragma once
 
 
+#include "../dag/CriticalFields.h"
+#include "../dag/TxDAGInterface.h"
 #include "ExecutiveFactory.h"
 #include "ExecutiveFlowInterface.h"
 #include "ExecutiveState.h"
+#include <gsl/util>
+#include <vector>
 namespace bcos::executor
 {
+
 
 class ExecutiveDagFlow : public virtual ExecutiveFlowInterface,
                          public std::enable_shared_from_this<ExecutiveDagFlow>
@@ -34,7 +39,9 @@ class ExecutiveDagFlow : public virtual ExecutiveFlowInterface,
 public:
     using Ptr = std::shared_ptr<ExecutiveDagFlow>;
 
-    ExecutiveDagFlow(ExecutiveFactory::Ptr executiveFactory) : m_executiveFactory(executiveFactory)
+    ExecutiveDagFlow(ExecutiveFactory::Ptr executiveFactory,
+        std::shared_ptr<ClockCache<bcos::bytes, FunctionAbi>> abiCache)
+      : m_executiveFactory(executiveFactory), m_abiCache(abiCache)
     {}
     virtual ~ExecutiveDagFlow() = default;
 
@@ -65,6 +72,18 @@ protected:
     void run(std::function<void(CallParameters::UniquePtr)> onTxReturn,
         std::function<void(bcos::Error::UniquePtr)> onFinished);
 
+    critical::CriticalFieldsInterface::Ptr generateDags(
+        std::vector<std::unique_ptr<CallParameters>>& inputs);
+
+    void executeTransactionsWithCriticals(critical::CriticalFieldsInterface::Ptr criticals,
+        gsl::span<std::unique_ptr<CallParameters>>& inputs,
+        std::vector<protocol::ExecutionMessage::UniquePtr>& executionResults);
+
+    bytes getComponentBytes(size_t index, const std::string& typeName, const bytesConstRef& data);
+
+    std::shared_ptr<std::vector<bytes>> extractConflictFields(const FunctionAbi& functionAbi,
+        const CallParameters& params, std::weak_ptr<BlockContext> _blockContext);
+
     template <class F>
     void asyncTo(F f)
     {
@@ -78,6 +97,8 @@ protected:
     ExecutiveFactory::Ptr m_executiveFactory;
     mutable bcos::RecursiveMutex x_lock;
     bool m_isRunning = true;
+
+    std::shared_ptr<ClockCache<bcos::bytes, FunctionAbi>> m_abiCache;
 };
 
 
