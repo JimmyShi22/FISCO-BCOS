@@ -92,6 +92,8 @@ class TxDAGFlow : public virtual TxDAGInterface
     using Task = tbb::flow::continue_node<tbb::flow::continue_msg>;
 
 public:
+    using Ptr = std::shared_ptr<TxDAGFlow>;
+
     TxDAGFlow() {}
 
     virtual ~TxDAGFlow() {}
@@ -100,9 +102,14 @@ public:
         critical::CriticalFieldsInterface::Ptr _txsCriticals, ExecuteTxFunc const& _f) override;
 
     void run(unsigned int threadNum) override;
+    void pause() { m_paused = true; };
+
+    bool hasFinished() { return currentTaskItr > m_tasks.size(); }
 
 private:
     std::vector<FlowTask::Ptr> m_tasks;
+    size_t currentTaskItr = 0;
+    bool m_paused = false;
 };
 
 }  // namespace executor

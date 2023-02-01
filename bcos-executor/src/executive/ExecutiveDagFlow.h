@@ -23,10 +23,12 @@
 
 
 #include "../dag/CriticalFields.h"
+#include "../dag/TxDAGFlow.h"
 #include "../dag/TxDAGInterface.h"
 #include "ExecutiveFactory.h"
 #include "ExecutiveFlowInterface.h"
 #include "ExecutiveState.h"
+#include <tbb/concurrent_unordered_map.h>
 #include <gsl/util>
 #include <vector>
 namespace bcos::executor
@@ -72,12 +74,10 @@ protected:
     void run(std::function<void(CallParameters::UniquePtr)> onTxReturn,
         std::function<void(bcos::Error::UniquePtr)> onFinished);
 
-    critical::CriticalFieldsInterface::Ptr generateDags(
+    critical::CriticalFieldsInterface::Ptr generateDagCriticals(
         std::vector<std::unique_ptr<CallParameters>>& inputs);
 
-    void executeTransactionsWithCriticals(critical::CriticalFieldsInterface::Ptr criticals,
-        gsl::span<std::unique_ptr<CallParameters>>& inputs,
-        std::vector<protocol::ExecutionMessage::UniquePtr>& executionResults);
+    TxDAGFlow::Ptr generateDagFlow(critical::CriticalFieldsInterface::Ptr criticals);
 
     bytes getComponentBytes(size_t index, const std::string& typeName, const bytesConstRef& data);
 
@@ -92,13 +92,18 @@ protected:
     }
 
     std::map<int64_t, CallParameters::UniquePtr, std::less<>> m_inputs;
+    TxDAGFlow::Ptr m_dagFlow;
     ExecutiveState::Ptr m_pausedExecutive;
+
+    std::function<void(CallParameters::UniquePtr)> f_onTxReturn;
+
 
     ExecutiveFactory::Ptr m_executiveFactory;
     mutable bcos::RecursiveMutex x_lock;
     bool m_isRunning = true;
-
     std::shared_ptr<ClockCache<bcos::bytes, FunctionAbi>> m_abiCache;
+
+    unsigned int m_DAGThreadNum = std::max(std::thread::hardware_concurrency(), (unsigned int)1);
 };
 
 

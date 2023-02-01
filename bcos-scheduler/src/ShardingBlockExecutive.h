@@ -51,6 +51,9 @@ public:
             _blockFactory, _txPool, _gasLimit, _syncBlock)
     {}
 
+    void asyncExecute(
+        std::function<void(Error::UniquePtr, protocol::BlockHeader::Ptr, bool)> callback) override;
+
     std::shared_ptr<DmcExecutor> registerAndGetDmcExecutor(std::string contractAddress) override;
     std::shared_ptr<DmcExecutor> buildDmcExecutor(const std::string& name,
         const std::string& contractAddress,

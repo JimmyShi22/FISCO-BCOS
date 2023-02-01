@@ -11,6 +11,64 @@ using namespace bcos::scheduler;
 using namespace bcos::storage;
 
 
+void ShardingBlockExecutive::asyncExecute(
+    std::function<void(Error::UniquePtr, protocol::BlockHeader::Ptr, bool)> callback)
+{
+    if (m_result)
+    {
+        callback(BCOS_ERROR_UNIQUE_PTR(SchedulerError::InvalidStatus, "Invalid status"), nullptr,
+            m_isSysBlock);
+        return;
+    }
+
+    if (m_scheduler->executorManager()->size() == 0)
+    {
+        callback(BCOS_ERROR_UNIQUE_PTR(
+                     SchedulerError::ExecutorNotEstablishedError, "The executor has not started!"),
+            nullptr, m_isSysBlock);
+    }
+    m_currentTimePoint = std::chrono::system_clock::now();
+
+    auto startT = utcTime();
+    prepare();
+
+    auto createMsgT = utcTime() - startT;
+    startT = utcTime();
+    if (!m_staticCall)
+    {
+        // Execute nextBlock
+        batchNextBlock([this, callback = std::move(callback)](Error::UniquePtr error) {
+            if (!m_isRunning)
+            {
+                callback(
+                    BCOS_ERROR_UNIQUE_PTR(SchedulerError::Stopped, "BlockExecutive is stopped"),
+                    nullptr, m_isSysBlock);
+                return;
+            }
+
+            if (error)
+            {
+                SCHEDULER_LOG(ERROR)
+                    << BLOCK_NUMBER(number()) << "Next block with error!" << error->errorMessage();
+                callback(BCOS_ERROR_WITH_PREV_UNIQUE_PTR(
+                             SchedulerError::NextBlockError, "Next block error!", *error),
+                    nullptr, m_isSysBlock);
+                return;
+            }
+
+            SCHEDULER_LOG(INFO) << BLOCK_NUMBER(number()) << LOG_BADGE("BlockTrace")
+                                << LOG_DESC("DMCExecute begin without DAGExecute");
+            DMCExecute(std::move(callback));
+        });
+    }
+    else
+    {
+        SCHEDULER_LOG(TRACE) << BLOCK_NUMBER(number()) << LOG_BADGE("BlockTrace")
+                             << LOG_DESC("DMCExecute begin for call");
+        DMCExecute(std::move(callback));
+    }
+}
+
 std::shared_ptr<DmcExecutor> ShardingBlockExecutive::registerAndGetDmcExecutor(
     std::string contractAddress)
 {

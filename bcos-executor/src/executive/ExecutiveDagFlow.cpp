@@ -17,7 +17,6 @@ using namespace bcos::executor;
 using namespace bcos::executor::critical;
 using namespace std;
 
-#define DAGFLOW_LOG(OBV) EXECUTOR_LOG(OBV) << LOG_BADGE("DAGFlow")
 
 void ExecutiveDagFlow::submit(CallParameters::UniquePtr txInput)
 {
@@ -42,6 +41,9 @@ void ExecutiveDagFlow::submit(CallParameters::UniquePtr txInput)
 void ExecutiveDagFlow::submit(std::shared_ptr<std::vector<CallParameters::UniquePtr>> txInputs)
 {
     bcos::RecursiveGuard lock(x_lock);
+    critical::CriticalFieldsInterface::Ptr criticals = generateDagCriticals(*txInputs);
+    m_dagFlow = generateDagFlow(criticals);
+
     for (auto& txInput : *txInputs)
     {
         submit(std::move(txInput));
@@ -77,6 +79,7 @@ void ExecutiveDagFlow::asyncRun(std::function<void(CallParameters::UniquePtr)> o
     }
 }
 
+/*
 void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxReturn,
     std::function<void(bcos::Error::UniquePtr)> onFinished)
 {
@@ -136,12 +139,46 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
     }
     catch (std::exception& e)
     {
-        EXECUTIVE_LOG(ERROR) << "ExecutiveDagFlow run error: " << boost::diagnostic_information(e);
+        DAGFLOW_LOG(ERROR) << "ExecutiveDagFlow run error: " << boost::diagnostic_information(e);
         onFinished(BCOS_ERROR_WITH_PREV_UNIQUE_PTR(-1, "ExecutiveDagFlow run error", e));
     }
 };
+/*/
+void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxReturn,
+    std::function<void(bcos::Error::UniquePtr)> onFinished)
+{
+    try
+    {
+        if (!m_isRunning)
+        {
+            DAGFLOW_LOG(DEBUG) << "ExecutiveDagFlow has stopped during running";
+            onFinished(BCOS_ERROR_UNIQUE_PTR(
+                ExecuteError::STOPPED, "ExecutiveDagFlow has stopped during running"));
+            return;
+        }
 
-critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDags(
+        f_onTxReturn = std::move(onTxReturn);
+        m_dagFlow->run(m_DAGThreadNum);
+        f_onTxReturn = nullptr;  // must deconstruct for ptr holder release
+
+        if (m_dagFlow->hasFinished())
+        {
+            m_inputs.clear();
+            m_dagFlow = nullptr;
+        }
+
+        onFinished(nullptr);
+    }
+    catch (std::exception& e)
+    {
+        DAGFLOW_LOG(ERROR) << "ExecutiveDagFlow run error: " << boost::diagnostic_information(e);
+        f_onTxReturn = nullptr;
+        onFinished(BCOS_ERROR_WITH_PREV_UNIQUE_PTR(-1, "ExecutiveDagFlow run error", e));
+    }
+};
+//*/
+
+critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
     std::vector<CallParameters::UniquePtr>& inputs)
 {
     auto transactionsNum = inputs.size();
@@ -359,11 +396,97 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDags(
     return txsCriticals;
 }
 
-void ExecutiveDagFlow::executeTransactionsWithCriticals(
-    critical::CriticalFieldsInterface::Ptr criticals,
-    gsl::span<std::unique_ptr<CallParameters>>& inputs,
-    std::vector<protocol::ExecutionMessage::UniquePtr>& executionResults)
-{}
+
+TxDAGFlow::Ptr ExecutiveDagFlow::generateDagFlow(critical::CriticalFieldsInterface::Ptr criticals)
+{
+    auto dagFlow = std::make_shared<TxDAGFlow>();
+
+    dagFlow->init(criticals, [this, &dagFlow, criticals](ID id) {
+        try
+        {
+            if (!m_isRunning)
+            {
+                return;
+            }
+
+            CallParameters::UniquePtr output;
+            bool isDagTx = criticals->contains(id);
+
+            if (isDagTx)
+            {
+                auto& input = m_inputs[id];
+                DAGFLOW_LOG(TRACE) << LOG_DESC("Execute tx: start DAG tx") << input->toString()
+                                   << LOG_KV("to", input->receiveAddress)
+                                   << LOG_KV("data", toHexStringWithPrefix(input->data));
+
+                // dag tx no need to use coroutine
+                auto executive = m_executiveFactory->build(
+                    input->codeAddress, input->contextID, input->seq, false);
+
+                output = executive->start(std::move(input));
+
+                if (output->type == CallParameters::MESSAGE)
+                {
+                    DAGFLOW_LOG(DEBUG) << LOG_BADGE("call/deploy in dag")
+                                       << LOG_KV("senderAddress", output->senderAddress)
+                                       << LOG_KV("codeAddress", output->codeAddress);
+                }
+
+                DAGFLOW_LOG(DEBUG) << "execute tx finish DAG " << output->toString();
+            }
+            else
+            {
+                // run normal tx
+                ExecutiveState::Ptr executiveState;
+                if (!m_pausedExecutive)
+                {
+                    auto& input = m_inputs[id];
+                    DAGFLOW_LOG(TRACE) << LOG_DESC("Execute tx: start normal tx")
+                                       << input->toString() << LOG_KV("to", input->receiveAddress)
+                                       << LOG_KV("data", toHexStringWithPrefix(input->data));
+
+                    executiveState =
+                        std::make_shared<ExecutiveState>(m_executiveFactory, std::move(input));
+                }
+                else
+                {
+                    executiveState = std::move(m_pausedExecutive);
+
+                    DAGFLOW_LOG(TRACE)
+                        << LOG_DESC("execute tx resume ") << executiveState->getContextID() << " | "
+                        << executiveState->getSeq();
+                }
+
+                auto seq = executiveState->getSeq();
+                output = executiveState->go();
+
+                // set result
+                output->contextID = id;
+                output->seq = seq;
+
+                if (output->type == CallParameters::MESSAGE ||
+                    output->type == CallParameters::KEY_LOCK)
+                {
+                    m_pausedExecutive = std::move(executiveState);
+                    // call back
+                    DAGFLOW_LOG(DEBUG) << "Execute tx: normal externalCall " << output->toString();
+                    dagFlow->pause();
+                }
+                else
+                {
+                    DAGFLOW_LOG(DEBUG) << "Execute tx: normal finish " << output->toString();
+                }
+            }
+            f_onTxReturn(std::move(output));
+        }
+        catch (std::exception& e)
+        {
+            DAGFLOW_LOG(ERROR) << "executeTransactionsWithCriticals error: "
+                               << boost::diagnostic_information(e);
+        }
+    });
+    return dagFlow;
+}
 
 
 bytes ExecutiveDagFlow::getComponentBytes(

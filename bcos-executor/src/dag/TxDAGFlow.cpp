@@ -119,9 +119,17 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals, Execu
 
 void TxDAGFlow::run(unsigned int threadNum)
 {
-    for (size_t i = 0; i < m_tasks.size(); i++)
+    m_paused = false;
+
+    while (currentTaskItr < m_tasks.size())
     {
-        auto& task = m_tasks[i];
+        auto& task = m_tasks[currentTaskItr];
         task->run();
+        currentTaskItr++;
+
+        if (m_paused)
+        {
+            break;
+        }
     }
 };
