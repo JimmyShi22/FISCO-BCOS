@@ -202,6 +202,10 @@ void DmcExecutor::go(std::function<void(bcos::Error::UniquePtr, Status)> callbac
     m_executivePool.forEachAndClear(MessageHint::NEED_SEND,
         [this, messages](int64_t contextID, ExecutiveState::Ptr executiveState) {
             auto& message = executiveState->message;
+            if (!message)
+            {
+                return true;
+            }
 
             auto keyLocks = m_keyLocks->getKeyLocksNotHoldingByContext(message->to(), contextID);
             message->setKeyLocks(std::move(keyLocks));

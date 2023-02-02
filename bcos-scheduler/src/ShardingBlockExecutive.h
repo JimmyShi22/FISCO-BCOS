@@ -54,6 +54,8 @@ public:
     void asyncExecute(
         std::function<void(Error::UniquePtr, protocol::BlockHeader::Ptr, bool)> callback) override;
 
+    void prepare() override;
+
     std::shared_ptr<DmcExecutor> registerAndGetDmcExecutor(std::string contractAddress) override;
     std::shared_ptr<DmcExecutor> buildDmcExecutor(const std::string& name,
         const std::string& contractAddress,

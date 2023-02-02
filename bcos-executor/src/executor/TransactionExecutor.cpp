@@ -948,7 +948,7 @@ void TransactionExecutor::executeTransactionsInternal(std::string contractAddres
                 auto message =
                     (boost::format("Unsupported message type: %d") % params->type()).str();
                 EXECUTOR_NAME_LOG(ERROR)
-                    << BLOCK_NUMBER(blockNumber) << "DAG Execute error, " << message;
+                    << BLOCK_NUMBER(blockNumber) << "Execute error, " << message;
                 // callback(BCOS_ERROR_UNIQUE_PTR(ExecuteError::DAG_ERROR, message), {});
                 break;
             }
@@ -2666,7 +2666,7 @@ void TransactionExecutor::executeTransactionsWithCriticals(
 {
     // DAG run
     shared_ptr<TxDAGInterface> txDag = make_shared<TxDAG2>();
-    txDag->init(criticals, [this, &inputs, &executionResults](ID id) {
+    txDag->setExecuteTxFunc([this, &inputs, &executionResults](ID id) {
         if (!m_isRunning)
         {
             return;
@@ -2700,6 +2700,8 @@ void TransactionExecutor::executeTransactionsWithCriticals(
                 << "executeTransactionsWithCriticals error: " << boost::diagnostic_information(e);
         }
     });
+
+    txDag->init(criticals);
 
     txDag->run(m_DAGThreadNum);
 }

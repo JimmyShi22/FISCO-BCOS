@@ -70,19 +70,42 @@ public:
         ExecutiveFlowInterface::stop();
     };
 
+    void setDagFlowIfNotExists(TxDAGFlow::Ptr dagFlow)
+    {
+        bcos::RecursiveGuard lock(x_lock);
+        if (!m_dagFlow)
+        {
+            m_dagFlow = dagFlow;
+        }
+    }
+
+    static TxDAGFlow::Ptr prepareDagFlow(BlockContext& blockContext,
+        ExecutiveFactory::Ptr executiveFactory,
+        std::vector<std::unique_ptr<CallParameters>>& inputs,
+        std::shared_ptr<ClockCache<bcos::bytes, FunctionAbi>> abiCache)
+    {
+        critical::CriticalFieldsInterface::Ptr criticals =
+            generateDagCriticals(blockContext, executiveFactory, inputs, abiCache);
+        return generateDagFlow(blockContext, criticals);
+    }
+
 protected:
     void run(std::function<void(CallParameters::UniquePtr)> onTxReturn,
         std::function<void(bcos::Error::UniquePtr)> onFinished);
 
-    critical::CriticalFieldsInterface::Ptr generateDagCriticals(
-        std::vector<std::unique_ptr<CallParameters>>& inputs);
+    static critical::CriticalFieldsInterface::Ptr generateDagCriticals(BlockContext& blockContext,
+        ExecutiveFactory::Ptr executiveFactory,
+        std::vector<std::unique_ptr<CallParameters>>& inputs,
+        std::shared_ptr<ClockCache<bcos::bytes, FunctionAbi>> abiCache);
 
-    TxDAGFlow::Ptr generateDagFlow(critical::CriticalFieldsInterface::Ptr criticals);
+    static TxDAGFlow::Ptr generateDagFlow(
+        const BlockContext& blockContext, critical::CriticalFieldsInterface::Ptr criticals);
 
-    bytes getComponentBytes(size_t index, const std::string& typeName, const bytesConstRef& data);
+    static bytes getComponentBytes(
+        size_t index, const std::string& typeName, const bytesConstRef& data);
 
-    std::shared_ptr<std::vector<bytes>> extractConflictFields(const FunctionAbi& functionAbi,
-        const CallParameters& params, std::weak_ptr<BlockContext> _blockContext);
+    static std::shared_ptr<std::vector<bytes>> extractConflictFields(const FunctionAbi& functionAbi,
+        const CallParameters& params, const BlockContext& blockContext);
 
     template <class F>
     void asyncTo(F f)
@@ -91,12 +114,10 @@ protected:
         ExecutiveFlowInterface::asyncTo<F>(std::move(f));
     }
 
-    std::map<int64_t, CallParameters::UniquePtr, std::less<>> m_inputs;
+    std::shared_ptr<std::vector<CallParameters::UniquePtr>> m_inputs = nullptr;
     TxDAGFlow::Ptr m_dagFlow;
     ExecutiveState::Ptr m_pausedExecutive;
-
     std::function<void(CallParameters::UniquePtr)> f_onTxReturn;
-
 
     ExecutiveFactory::Ptr m_executiveFactory;
     mutable bcos::RecursiveMutex x_lock;

@@ -33,12 +33,15 @@ public:
         bcos::protocol::Block::Ptr block,
         bcos::executor::ParallelTransactionExecutorInterface::Ptr executor,
         GraphKeyLocks::Ptr keyLocks, bcos::crypto::Hash::Ptr hashImpl,
-        DmcStepRecorder::Ptr dmcRecorder)
+        DmcStepRecorder::Ptr dmcRecorder, int64_t schedulerTermId)
       : DmcExecutor(std::move(name), std::move(contractAddress), block, executor, keyLocks,
-            hashImpl, dmcRecorder)
+            hashImpl, dmcRecorder),
+        m_schedulerTermId(schedulerTermId)
     {}
 
     ~ShardingDmcExecutor() override = default;
+
+    void go(std::function<void(bcos::Error::UniquePtr, Status)> callback) override;
 
     void executorCall(bcos::protocol::ExecutionMessage::UniquePtr input,
         std::function<void(bcos::Error::UniquePtr, bcos::protocol::ExecutionMessage::UniquePtr)>
@@ -46,10 +49,15 @@ public:
 
     void executorExecuteTransactions(std::string contractAddress,
         gsl::span<bcos::protocol::ExecutionMessage::UniquePtr> inputs,
-
         // called every time at all tx stop( pause or finish)
         std::function<void(
             bcos::Error::UniquePtr, std::vector<bcos::protocol::ExecutionMessage::UniquePtr>)>
             callback) override;
+
+    void preExecute() override;
+
+private:
+    int64_t m_schedulerTermId;
+    mutable bcos::SharedMutex x_preExecute;
 };
 }  // namespace bcos::scheduler

@@ -834,7 +834,7 @@ ViewChangeMsgInterface::Ptr PBFTCacheProcessor::fetchPrecommitData(
     return pbftMessage;
 }
 
-void PBFTCacheProcessor::removeConsensusedCache(ViewType _view, BlockNumber _consensusedNumber)
+void PBFTCacheProcessor::removeConsensusedCache(ViewType _view,bcos::protocol::BlockNumber _consensusedNumber)
 {
     m_proposalsToStableConsensus.erase(_consensusedNumber);
     for (auto pcache = m_caches.begin(); pcache != m_caches.end();)
@@ -855,7 +855,7 @@ void PBFTCacheProcessor::removeConsensusedCache(ViewType _view, BlockNumber _con
 
 
 void PBFTCacheProcessor::resetCacheAfterViewChange(
-    ViewType _view, BlockNumber _latestCommittedProposal)
+    ViewType _view,bcos::protocol::BlockNumber _latestCommittedProposal)
 {
     for (auto const& it : m_caches)
     {
@@ -884,7 +884,7 @@ void PBFTCacheProcessor::removeInvalidRecoverCache(ViewType _view)
 }
 
 void PBFTCacheProcessor::removeInvalidViewChange(
-    ViewType _view, BlockNumber _latestCommittedProposal)
+    ViewType _view,bcos::protocol::BlockNumber _latestCommittedProposal)
 {
     for (auto it = m_viewChangeCache.begin(); it != m_viewChangeCache.end();)
     {

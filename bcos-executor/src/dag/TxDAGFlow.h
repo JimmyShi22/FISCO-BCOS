@@ -31,8 +31,6 @@ namespace bcos
 namespace executor
 {
 
-using ExecuteTxFuncPtr = std::shared_ptr<ExecuteTxFunc>;
-
 class FlowTask
 {
 public:
@@ -43,24 +41,24 @@ public:
     };
 
     using Ptr = std::shared_ptr<FlowTask>;
-    FlowTask(ExecuteTxFuncPtr _f) : f_executeTx(_f){};
+    FlowTask(ExecuteTxFunc _f) : f_executeTx(_f){};
     virtual ~FlowTask() = default;
     virtual void run() = 0;
     virtual Type type() = 0;
 
 protected:
-    ExecuteTxFuncPtr f_executeTx;
+    ExecuteTxFunc f_executeTx;
 };
 
 class NormalTxTask : public FlowTask
 {
 public:
-    NormalTxTask(ExecuteTxFuncPtr _f, critical::ID id) : FlowTask(_f), m_id(id) {}
+    NormalTxTask(ExecuteTxFunc _f, critical::ID id) : FlowTask(_f), m_id(id) {}
     ~NormalTxTask() override = default;
     void run() override
     {
         DAGFLOW_LOG(TRACE) << "Task run: NormalTxTask";
-        (*f_executeTx)(m_id);
+        f_executeTx(m_id);
     };
     Type type() override { return Type::Normal; }
 
@@ -74,7 +72,7 @@ class DagTxsTask : public FlowTask
     using Msg = const tbb::flow::continue_msg&;
 
 public:
-    DagTxsTask(ExecuteTxFuncPtr _f) : FlowTask(_f), m_startTask(m_dag) {}
+    DagTxsTask(ExecuteTxFunc _f) : FlowTask(_f), m_startTask(m_dag) {}
     ~DagTxsTask() override = default;
     void run() override;
     Type type() override { return Type::DAG; }
@@ -98,16 +96,22 @@ public:
 
     virtual ~TxDAGFlow() {}
 
-    void init(
-        critical::CriticalFieldsInterface::Ptr _txsCriticals, ExecuteTxFunc const& _f) override;
+    void setExecuteTxFunc(ExecuteTxFunc const& _f) override { f_executeTx = _f; };
+    void init(critical::CriticalFieldsInterface::Ptr _txsCriticals) override;
 
     void run(unsigned int threadNum) override;
     void pause() { m_paused = true; };
 
     bool hasFinished() { return currentTaskItr > m_tasks.size(); }
 
+    bool isDagTx(critical::ID id) { return m_txsCriticals->contains(id); }
+
 private:
+    void runExecuteTxFunc(uint32_t id) { f_executeTx(id); }
+
+    ExecuteTxFunc f_executeTx;
     std::vector<FlowTask::Ptr> m_tasks;
+    critical::CriticalFieldsInterface::Ptr m_txsCriticals;
     size_t currentTaskItr = 0;
     bool m_paused = false;
 };

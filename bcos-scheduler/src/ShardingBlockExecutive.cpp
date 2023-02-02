@@ -10,6 +10,33 @@
 using namespace bcos::scheduler;
 using namespace bcos::storage;
 
+void ShardingBlockExecutive::prepare()
+{
+    if (m_hasPrepared)
+    {
+        return;
+    }
+    BlockExecutive::prepare();
+
+
+    if (m_staticCall)
+    {
+        return;  // staticCall no need to preExecute
+    }
+
+    SCHEDULER_LOG(TRACE) << BLOCK_NUMBER(number()) << LOG_BADGE("Sharding")
+                         << LOG_DESC("dmcExecutor try to preExecute");
+    if (m_hasDAG)
+    {
+        // has dag also need to serialPrepareExecutor
+        serialPrepareExecutor();
+    }
+
+    for (auto& dmcExecutor : m_dmcExecutors)
+    {
+        dmcExecutor.second->preExecute();
+    }
+}
 
 void ShardingBlockExecutive::asyncExecute(
     std::function<void(Error::UniquePtr, protocol::BlockHeader::Ptr, bool)> callback)
@@ -85,8 +112,8 @@ DmcExecutor::Ptr ShardingBlockExecutive::buildDmcExecutor(const std::string& nam
     const std::string& contractAddress,
     bcos::executor::ParallelTransactionExecutorInterface::Ptr executor)
 {
-    auto dmcExecutor = std::make_shared<ShardingDmcExecutor>(
-        name, contractAddress, m_block, executor, m_keyLocks, m_hashImpl, m_dmcRecorder);
+    auto dmcExecutor = std::make_shared<ShardingDmcExecutor>(name, contractAddress, m_block,
+        executor, m_keyLocks, m_hashImpl, m_dmcRecorder, m_schedulerTermId);
     return dmcExecutor;
 }
 

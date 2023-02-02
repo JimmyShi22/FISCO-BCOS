@@ -71,7 +71,7 @@ public:
     void releaseOutdatedLock();
     bool detectLockAndRevert();  // return true if detect a tx and revert
 
-    void go(std::function<void(bcos::Error::UniquePtr, Status)> callback);
+    virtual void go(std::function<void(bcos::Error::UniquePtr, Status)> callback);
     bool hasFinished() { return m_executivePool.empty(); }
 
     void scheduleIn(ExecutiveState::Ptr executive);
@@ -120,6 +120,12 @@ public:
                 return true;
             });
     }
+
+    virtual void preExecute()
+    {
+        // do nothing
+    }
+
 
 protected:
     virtual void executorCall(bcos::protocol::ExecutionMessage::UniquePtr input,

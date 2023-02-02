@@ -62,6 +62,17 @@ public:
         int64_t contextID, int64_t seq, bool useCoroutine = true);
     std::weak_ptr<BlockContext> getBlockContext() { return m_blockContext; };
 
+    std::shared_ptr<precompiled::Precompiled> getPrecompiled(const std::string& address) const
+    {
+        auto constantPrecompiled = m_constantPrecompiled->find(address);
+
+        if (constantPrecompiled != m_constantPrecompiled->end())
+        {
+            return constantPrecompiled->second;
+        }
+        return {};
+    }
+
 protected:
     void setParams(std::shared_ptr<TransactionExecutive> executive);
 

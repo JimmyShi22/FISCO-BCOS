@@ -784,7 +784,7 @@ BOOST_FIXTURE_TEST_SUITE(precompiledTableTestV320, TableFactoryPrecompiledV320Fi
 BOOST_AUTO_TEST_CASE(createTableTest)
 {
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -875,7 +875,7 @@ BOOST_AUTO_TEST_CASE(createTableTest)
 BOOST_AUTO_TEST_CASE(createTableWasmTest)
 {
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -968,7 +968,7 @@ BOOST_AUTO_TEST_CASE(insertLexicographicOrderTest)
 {
     // Lexicographic Order
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1049,7 +1049,7 @@ BOOST_AUTO_TEST_CASE(insertLexicographicOrderTest)
 BOOST_AUTO_TEST_CASE(insertNumericalOrderTest)
 {
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test_1", 1, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1131,7 +1131,7 @@ BOOST_AUTO_TEST_CASE(insertLexicographicOrderWasmTest)
     // Lexicographic Order
     init(true);
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1213,7 +1213,7 @@ BOOST_AUTO_TEST_CASE(insertNumericalOrdeWasmTest)
     // Numerical Order
     init(true);
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test_1", 1, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1298,7 +1298,7 @@ BOOST_AUTO_TEST_CASE(selectLexicographicOrderTest)
         return stream.str();
     };
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1327,7 +1327,7 @@ BOOST_AUTO_TEST_CASE(selectLexicographicOrderTest)
 BOOST_AUTO_TEST_CASE(selectNumericalOrderTest)
 {
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 1, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1393,7 +1393,7 @@ BOOST_AUTO_TEST_CASE(selectLexicographicOrderWasmTest)
         return stream.str();
     };
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1423,7 +1423,7 @@ BOOST_AUTO_TEST_CASE(selectNumericalOrderWasmTest)
 {
     init(true);
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 1, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1483,7 +1483,7 @@ BOOST_AUTO_TEST_CASE(selectNumericalOrderWasmTest)
 BOOST_AUTO_TEST_CASE(updateLexicographicOrderTest)
 {
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1548,7 +1548,7 @@ BOOST_AUTO_TEST_CASE(updateLexicographicOrderTest)
 BOOST_AUTO_TEST_CASE(updateNumericalOrderTest)
 {
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 1, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1651,7 +1651,7 @@ BOOST_AUTO_TEST_CASE(updateLexicographicOrderWasmTest)
 {
     init(true);
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1717,7 +1717,7 @@ BOOST_AUTO_TEST_CASE(updateNumericalOrderWasmTest)
 {
     init(true);
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 1, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1819,7 +1819,7 @@ BOOST_AUTO_TEST_CASE(updateNumericalOrderWasmTest)
 BOOST_AUTO_TEST_CASE(removeLexicographicOrderTest)
 {
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1850,7 +1850,7 @@ BOOST_AUTO_TEST_CASE(removeLexicographicOrderTest)
 BOOST_AUTO_TEST_CASE(removeNumericalOrderTest)
 {
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 1, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1916,7 +1916,7 @@ BOOST_AUTO_TEST_CASE(removeLexicographicOrderWasmTest)
 {
     init(true);
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 0, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -1948,7 +1948,7 @@ BOOST_AUTO_TEST_CASE(removeNumericalOrderWasmTest)
 {
     init(true);
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test", 1, "id", {"item_name", "item_id"}, callAddress);
     }
@@ -2015,7 +2015,7 @@ BOOST_AUTO_TEST_CASE(countTest)
     const int INSERT_COUNT = 10000;
 
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         // Numerical Order
         creatTable(number++, "t_test_condv320", 1, "id", {"value"}, callAddress);
@@ -2251,7 +2251,7 @@ BOOST_AUTO_TEST_CASE(countWasmTest)
     const int INSERT_COUNT = 10000;
 
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         // Numerical Order
         creatTable(number++, "t_test_condv320", 1, "id", {"value"}, callAddress);
@@ -2487,7 +2487,7 @@ BOOST_AUTO_TEST_CASE(selectByCondTest)
     const int INSERT_COUNT = 10000;
 
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         // Numerical Order
         creatTable(number++, "t_test_condv320", 1, "id", {"value"}, callAddress);
@@ -2856,7 +2856,7 @@ BOOST_AUTO_TEST_CASE(selectByCondWasmTest)
     const int INSERT_COUNT = 10000;
 
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         // Numerical Order
         creatTable(number++, "t_test_condv320", 1, "id", {"value"}, callAddress);
@@ -3222,7 +3222,7 @@ BOOST_AUTO_TEST_CASE(updateByCondTest)
 {
     const int INSERT_COUNT = 10000;
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         // Numerical Order
         creatTable(number++, "t_test_condv320", 1, "id", {"value"}, callAddress);
@@ -3426,7 +3426,7 @@ BOOST_AUTO_TEST_CASE(updateByCondWasmTest)
     init(true);
     const int INSERT_COUNT = 10000;
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         // Numerical Order
         creatTable(number++, "t_test_condv320", 1, "id", {"value"}, callAddress);
@@ -3629,7 +3629,7 @@ BOOST_AUTO_TEST_CASE(removeByCondTest)
 {
     const int INSERT_COUNT = 10000;
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test_condv320", 1, "id", {"value"}, callAddress);
     }
@@ -3940,7 +3940,7 @@ BOOST_AUTO_TEST_CASE(removeByCondWasmTest)
     init(true);
     const int INSERT_COUNT = 10000;
     auto callAddress = tableTestAddress;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test_condv320", 1, "id", {"value"}, callAddress);
     }
@@ -4250,7 +4250,7 @@ BOOST_AUTO_TEST_CASE(containsTest)
 {
     auto callAddress = tableTestAddress;
     const int INSERT_COUNT = 500;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test_condv320", 0, "id", {"v1", "v2"}, callAddress);
     }
@@ -4427,7 +4427,7 @@ BOOST_AUTO_TEST_CASE(containsWasmTest)
 
     auto callAddress = tableTestAddress;
     const int INSERT_COUNT = 500;
-    BlockNumber number = 1;
+    bcos::protocol::BlockNumber number = 1;
     {
         creatTable(number++, "t_test_condv320", 0, "id", {"v1", "v2"}, callAddress);
     }

@@ -20,6 +20,9 @@ using namespace std;
 
 void ExecutiveDagFlow::submit(CallParameters::UniquePtr txInput)
 {
+    // m_inputs must has been initialized
+    assert(m_inputs);
+
     bcos::RecursiveGuard lock(x_lock);
     if (m_pausedExecutive)
     {
@@ -34,19 +37,39 @@ void ExecutiveDagFlow::submit(CallParameters::UniquePtr txInput)
     // is new tx
     auto contextID = txInput->contextID;
 
-    m_inputs.emplace(contextID, std::move(txInput));
+    // contextID must valid
+    assert(contextID < (int64_t)m_inputs->size());
+
+    (*m_inputs)[contextID] = std::move(txInput);
 };
 
 
 void ExecutiveDagFlow::submit(std::shared_ptr<std::vector<CallParameters::UniquePtr>> txInputs)
 {
     bcos::RecursiveGuard lock(x_lock);
-    critical::CriticalFieldsInterface::Ptr criticals = generateDagCriticals(*txInputs);
-    m_dagFlow = generateDagFlow(criticals);
-
-    for (auto& txInput : *txInputs)
+    if (m_dagFlow)
     {
-        submit(std::move(txInput));
+        // m_dagFlow has been set before this function call, just use it
+    }
+    else
+    {
+        // generate m_dagFlow
+        m_dagFlow = prepareDagFlow(*m_executiveFactory->getBlockContext().lock(),
+            m_executiveFactory, *txInputs, m_abiCache);
+    }
+
+    if (!m_inputs)
+    {
+        // is first in
+        m_inputs = txInputs;
+    }
+    else
+    {
+        // is dmc resume input
+        for (auto& txInput : *txInputs)
+        {
+            submit(std::move(txInput));
+        }
     }
 };
 
@@ -86,8 +109,8 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
     try
     {
         auto contextID =
-            m_pausedExecutive ? m_pausedExecutive->getContextID() : m_inputs.begin()->first;
-        for (; contextID < (int64_t)m_inputs.size(); contextID++)
+            m_pausedExecutive ? m_pausedExecutive->getContextID() : m_inputs->begin()->first;
+        for (; contextID < (int64_t)m_inputs->size(); contextID++)
         {
             if (!m_isRunning)
             {
@@ -105,7 +128,7 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
                 auto& txInput = m_inputs[contextID];
                 executiveState =
                     std::make_shared<ExecutiveState>(m_executiveFactory, std::move(txInput));
-                m_inputs.erase(contextID);
+                m_inputs->erase(contextID);
             }
             else
             {
@@ -157,13 +180,102 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
             return;
         }
 
+
+        m_dagFlow->setExecuteTxFunc([this](ID id) {
+            try
+            {
+                if (!m_isRunning)
+                {
+                    return;
+                }
+
+                CallParameters::UniquePtr output;
+                bool isDagTx = m_dagFlow->isDagTx(id);
+
+                if (isDagTx)
+                {
+                    auto& input = (*m_inputs)[id];
+                    DAGFLOW_LOG(TRACE) << LOG_DESC("Execute tx: start DAG tx") << input->toString()
+                                       << LOG_KV("to", input->receiveAddress)
+                                       << LOG_KV("data", toHexStringWithPrefix(input->data));
+
+                    // dag tx no need to use coroutine
+                    auto executive = m_executiveFactory->build(
+                        input->codeAddress, input->contextID, input->seq, false);
+
+                    output = executive->start(std::move(input));
+
+                    if (output->type == CallParameters::MESSAGE)
+                    {
+                        DAGFLOW_LOG(DEBUG) << LOG_BADGE("call/deploy in dag")
+                                           << LOG_KV("senderAddress", output->senderAddress)
+                                           << LOG_KV("codeAddress", output->codeAddress);
+                    }
+
+                    DAGFLOW_LOG(DEBUG) << "execute tx finish DAG " << output->toString();
+                }
+                else
+                {
+                    // run normal tx
+                    ExecutiveState::Ptr executiveState;
+                    if (!m_pausedExecutive)
+                    {
+                        auto& input = (*m_inputs)[id];
+                        DAGFLOW_LOG(TRACE)
+                            << LOG_DESC("Execute tx: start normal tx") << input->toString()
+                            << LOG_KV("to", input->receiveAddress)
+                            << LOG_KV("data", toHexStringWithPrefix(input->data));
+
+                        executiveState =
+                            std::make_shared<ExecutiveState>(m_executiveFactory, std::move(input));
+                    }
+                    else
+                    {
+                        executiveState = std::move(m_pausedExecutive);
+
+                        DAGFLOW_LOG(TRACE)
+                            << LOG_DESC("execute tx resume ") << executiveState->getContextID()
+                            << " | " << executiveState->getSeq();
+                    }
+
+                    auto seq = executiveState->getSeq();
+                    output = executiveState->go();
+
+                    // set result
+                    output->contextID = id;
+                    output->seq = seq;
+
+                    if (output->type == CallParameters::MESSAGE ||
+                        output->type == CallParameters::KEY_LOCK)
+                    {
+                        m_pausedExecutive = std::move(executiveState);
+                        // call back
+                        DAGFLOW_LOG(DEBUG)
+                            << "Execute tx: normal externalCall " << output->toString();
+                        m_dagFlow->pause();
+                    }
+                    else
+                    {
+                        DAGFLOW_LOG(DEBUG) << "Execute tx: normal finish " << output->toString();
+                    }
+                }
+                f_onTxReturn(std::move(output));
+            }
+            catch (std::exception& e)
+            {
+                DAGFLOW_LOG(ERROR) << "executeTransactionsWithCriticals error: "
+                                   << boost::diagnostic_information(e);
+            }
+        });
+
         f_onTxReturn = std::move(onTxReturn);
         m_dagFlow->run(m_DAGThreadNum);
         f_onTxReturn = nullptr;  // must deconstruct for ptr holder release
 
         if (m_dagFlow->hasFinished())
         {
-            m_inputs.clear();
+            // clear input data
+            m_inputs = nullptr;
             m_dagFlow = nullptr;
         }
 
@@ -178,8 +290,11 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
 };
 //*/
 
+
 critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
-    std::vector<CallParameters::UniquePtr>& inputs)
+    BlockContext& blockContext, ExecutiveFactory::Ptr executiveFactory,
+    std::vector<CallParameters::UniquePtr>& inputs,
+    std::shared_ptr<ClockCache<bcos::bytes, FunctionAbi>> abiCache)
 {
     auto transactionsNum = inputs.size();
 
@@ -194,7 +309,6 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
         [&](const tbb::blocked_range<uint64_t>& range) {
             try
             {
-                auto blockContext = m_executiveFactory->getBlockContext();
                 for (auto i = range.begin(); i != range.end(); ++i)
                 {
                     const auto& params = inputs[i];
@@ -207,9 +321,7 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
                     auto abiKey = bytes(to.cbegin(), to.cend());
                     abiKey.insert(abiKey.end(), selector.begin(), selector.end());
                     // if precompiled
-                    auto p = m_executiveFactory
-                                 ->build(params->codeAddress, params->contextID, params->seq, false)
-                                 ->getPrecompiled(params->receiveAddress);
+                    auto p = executiveFactory->getPrecompiled(params->receiveAddress);
                     if (p)
                     {
                         // Precompile transaction
@@ -217,8 +329,8 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
                         {
                             DAGFLOW_LOG(TRACE)
                                 << "generateDags: isParallelPrecompiled " << LOG_KV("address", to);
-                            auto criticals = vector<string>(p->getParallelTag(ref(params->data),
-                                m_executiveFactory->getBlockContext().lock()->isWasm()));
+                            auto criticals = vector<string>(
+                                p->getParallelTag(ref(params->data), blockContext.isWasm()));
                             conflictFields = make_shared<vector<bytes>>();
                             for (string& critical : criticals)
                             {
@@ -240,7 +352,7 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
                     }
                     else
                     {
-                        auto cacheHandle = m_abiCache->lookup(abiKey);
+                        auto cacheHandle = abiCache->lookup(abiKey);
                         // find FunctionAbi in cache first
                         if (!cacheHandle.isValid())
                         {
@@ -250,7 +362,7 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
 
                             std::lock_guard guard(tableMutex);
 
-                            cacheHandle = m_abiCache->lookup(abiKey);
+                            cacheHandle = abiCache->lookup(abiKey);
                             if (cacheHandle.isValid())
                             {
                                 DAGFLOW_LOG(TRACE)
@@ -258,12 +370,12 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
                                     << LOG_DESC("ABI had been loaded by other workers")
                                     << LOG_KV("abiKey", toHexStringWithPrefix(abiKey));
                                 auto& functionAbi = cacheHandle.value();
-                                conflictFields = extractConflictFields(
-                                    functionAbi, *params, blockContext.lock());
+                                conflictFields =
+                                    extractConflictFields(functionAbi, *params, blockContext);
                             }
                             else
                             {
-                                auto storage = blockContext.lock()->storage();
+                                auto storage = blockContext.storage();
 
                                 auto tableName = "/apps/" + string(to);
 
@@ -280,7 +392,7 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
                                 // get abi json
                                 // new logic
                                 std::string_view abiStr;
-                                if (blockContext.lock()->blockVersion() >=
+                                if (blockContext.blockVersion() >=
                                     uint32_t(bcos::protocol::BlockVersion::V3_1_VERSION))
                                 {
                                     // get codehash
@@ -322,9 +434,8 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
                                     auto entry = table->getRow(ACCOUNT_ABI);
                                     abiStr = entry->getField(0);
                                 }
-                                bool isSmCrypto =
-                                    blockContext.lock()->hashHandler()->getHashImplType() ==
-                                    crypto::HashImplType::Sm3Hash;
+                                bool isSmCrypto = blockContext.hashHandler()->getHashImplType() ==
+                                                  crypto::HashImplType::Sm3Hash;
 
                                 DAGFLOW_LOG(TRACE) << "generateDags: " << LOG_DESC("ABI loaded")
                                                    << LOG_KV("address", to)
@@ -349,7 +460,7 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
                                 }
 
                                 auto abiPtr = functionAbi.get();
-                                if (m_abiCache->insert(abiKey, abiPtr, &cacheHandle))
+                                if (abiCache->insert(abiKey, abiPtr, &cacheHandle))
                                 {
                                     // If abi object had been inserted into the cache
                                     // successfully, the cache will take charge of life time
@@ -358,7 +469,7 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
                                     std::ignore = functionAbi.release();
                                 }
                                 conflictFields =
-                                    extractConflictFields(*abiPtr, *params, blockContext.lock());
+                                    extractConflictFields(*abiPtr, *params, blockContext);
                             }
                         }
                         else
@@ -368,7 +479,7 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
                                                << LOG_KV("abiKey", toHexStringWithPrefix(abiKey));
                             auto& functionAbi = cacheHandle.value();
                             conflictFields =
-                                extractConflictFields(functionAbi, *params, blockContext.lock());
+                                extractConflictFields(functionAbi, *params, blockContext);
                         }
                     }
                     if (conflictFields == nullptr)
@@ -397,94 +508,12 @@ critical::CriticalFieldsInterface::Ptr ExecutiveDagFlow::generateDagCriticals(
 }
 
 
-TxDAGFlow::Ptr ExecutiveDagFlow::generateDagFlow(critical::CriticalFieldsInterface::Ptr criticals)
+TxDAGFlow::Ptr ExecutiveDagFlow::generateDagFlow(
+    const BlockContext& blockContext, critical::CriticalFieldsInterface::Ptr criticals)
 {
     auto dagFlow = std::make_shared<TxDAGFlow>();
 
-    dagFlow->init(criticals, [this, &dagFlow, criticals](ID id) {
-        try
-        {
-            if (!m_isRunning)
-            {
-                return;
-            }
-
-            CallParameters::UniquePtr output;
-            bool isDagTx = criticals->contains(id);
-
-            if (isDagTx)
-            {
-                auto& input = m_inputs[id];
-                DAGFLOW_LOG(TRACE) << LOG_DESC("Execute tx: start DAG tx") << input->toString()
-                                   << LOG_KV("to", input->receiveAddress)
-                                   << LOG_KV("data", toHexStringWithPrefix(input->data));
-
-                // dag tx no need to use coroutine
-                auto executive = m_executiveFactory->build(
-                    input->codeAddress, input->contextID, input->seq, false);
-
-                output = executive->start(std::move(input));
-
-                if (output->type == CallParameters::MESSAGE)
-                {
-                    DAGFLOW_LOG(DEBUG) << LOG_BADGE("call/deploy in dag")
-                                       << LOG_KV("senderAddress", output->senderAddress)
-                                       << LOG_KV("codeAddress", output->codeAddress);
-                }
-
-                DAGFLOW_LOG(DEBUG) << "execute tx finish DAG " << output->toString();
-            }
-            else
-            {
-                // run normal tx
-                ExecutiveState::Ptr executiveState;
-                if (!m_pausedExecutive)
-                {
-                    auto& input = m_inputs[id];
-                    DAGFLOW_LOG(TRACE) << LOG_DESC("Execute tx: start normal tx")
-                                       << input->toString() << LOG_KV("to", input->receiveAddress)
-                                       << LOG_KV("data", toHexStringWithPrefix(input->data));
-
-                    executiveState =
-                        std::make_shared<ExecutiveState>(m_executiveFactory, std::move(input));
-                }
-                else
-                {
-                    executiveState = std::move(m_pausedExecutive);
-
-                    DAGFLOW_LOG(TRACE)
-                        << LOG_DESC("execute tx resume ") << executiveState->getContextID() << " | "
-                        << executiveState->getSeq();
-                }
-
-                auto seq = executiveState->getSeq();
-                output = executiveState->go();
-
-                // set result
-                output->contextID = id;
-                output->seq = seq;
-
-                if (output->type == CallParameters::MESSAGE ||
-                    output->type == CallParameters::KEY_LOCK)
-                {
-                    m_pausedExecutive = std::move(executiveState);
-                    // call back
-                    DAGFLOW_LOG(DEBUG) << "Execute tx: normal externalCall " << output->toString();
-                    dagFlow->pause();
-                }
-                else
-                {
-                    DAGFLOW_LOG(DEBUG) << "Execute tx: normal finish " << output->toString();
-                }
-            }
-            f_onTxReturn(std::move(output));
-        }
-        catch (std::exception& e)
-        {
-            DAGFLOW_LOG(ERROR) << "executeTransactionsWithCriticals error: "
-                               << boost::diagnostic_information(e);
-        }
-    });
+    dagFlow->init(criticals);
     return dagFlow;
 }
 
@@ -507,8 +536,7 @@ bytes ExecutiveDagFlow::getComponentBytes(
 }
 
 std::shared_ptr<std::vector<bytes>> ExecutiveDagFlow::extractConflictFields(
-    const FunctionAbi& functionAbi, const CallParameters& params,
-    std::weak_ptr<BlockContext> _blockContext)
+    const FunctionAbi& functionAbi, const CallParameters& params, const BlockContext& _blockContext)
 {
     if (functionAbi.conflictFields.empty())
     {
@@ -578,7 +606,7 @@ std::shared_ptr<std::vector<bytes>> ExecutiveDagFlow::extractConflictFields(
             }
             case EnvKind::Now:
             {
-                auto now = _blockContext.lock()->timestamp();
+                auto now = _blockContext.timestamp();
                 auto bytes = static_cast<bcos::byte*>(static_cast<void*>(&now));
                 criticalKey.insert(criticalKey.end(), bytes, bytes + sizeof(now));
 
@@ -588,7 +616,7 @@ std::shared_ptr<std::vector<bytes>> ExecutiveDagFlow::extractConflictFields(
             }
             case EnvKind::BlockNumber:
             {
-                auto blockNumber = _blockContext.lock()->number();
+                auto blockNumber = _blockContext.number();
                 auto bytes = static_cast<bcos::byte*>(static_cast<void*>(&blockNumber));
                 criticalKey.insert(criticalKey.end(), bytes, bytes + sizeof(blockNumber));
 
@@ -621,7 +649,7 @@ std::shared_ptr<std::vector<bytes>> ExecutiveDagFlow::extractConflictFields(
             const ParameterAbi* paramAbi = nullptr;
             auto components = &functionAbi.inputs;
             auto inputData = ref(params.data).getCroppedData(4).toBytes();
-            if (_blockContext.lock()->isWasm())
+            if (_blockContext.isWasm())
             {
                 auto startPos = 0u;
                 for (auto segment : conflictField.value)

@@ -33,37 +33,33 @@ void DagTxsTask::run()
 void DagTxsTask::makeEdge(critical::ID from, critical::ID to)
 {
     auto& fromTask =
-        m_tasks.try_emplace(from, Task(m_dag, [this, from](Msg) { (*f_executeTx)(from); }))
+        m_tasks.try_emplace(from, Task(m_dag, [this, from](Msg) { f_executeTx(from); }))
             .first->second;
     auto& toTask =
-        m_tasks.try_emplace(to, Task(m_dag, [this, to](Msg) { (*f_executeTx)(to); })).first->second;
+        m_tasks.try_emplace(to, Task(m_dag, [this, to](Msg) { f_executeTx(to); })).first->second;
     make_edge(fromTask, toTask);
 };
 void DagTxsTask::makeVertex(critical::ID id)
 {
     auto& task =
-        m_tasks.try_emplace(id, Task(m_dag, [this, id](Msg) { (*f_executeTx)(id); })).first->second;
+        m_tasks.try_emplace(id, Task(m_dag, [this, id](Msg) { f_executeTx(id); })).first->second;
     make_edge(m_startTask, task);
 };
 
-inline bool isDagTx(critical::CriticalFieldsInterface::Ptr _txsCriticals, critical::ID id)
+void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals)
 {
-    return _txsCriticals->contains(id);
-}
-
-void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals, ExecuteTxFunc const& _f)
-{
+    m_txsCriticals = _txsCriticals;
     auto txsSize = _txsCriticals->size();
     DAGFLOW_LOG(INFO) << LOG_DESC("Begin init TxDAGFlow") << LOG_KV("transactionNum", txsSize);
-    auto f_executeTx = std::make_shared<ExecuteTxFunc>(_f);
 
     FlowTask::Ptr currentTask = nullptr;
+    auto executeTxHandler = [this](uint32_t id) { runExecuteTxFunc(id); };
     // define conflict handler
     auto onConflictHandler = [&](critical::ID pId, critical::ID id) {
         // only DAG Task
         if (!currentTask || currentTask->type() != FlowTask::Type::DAG)
         {
-            currentTask = std::make_shared<DagTxsTask>(f_executeTx);
+            currentTask = std::make_shared<DagTxsTask>(executeTxHandler);
             m_tasks.push_back(currentTask);
         }
 
@@ -72,12 +68,12 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals, Execu
     };
 
     auto onFirstConflictHandler = [&](critical::ID id) {
-        if (isDagTx(_txsCriticals, id))
+        if (isDagTx(id))
         {
             // only DAG Task
             if (!currentTask || currentTask->type() != FlowTask::Type::DAG)
             {
-                currentTask = std::make_shared<DagTxsTask>(f_executeTx);
+                currentTask = std::make_shared<DagTxsTask>(executeTxHandler);
                 m_tasks.push_back(currentTask);
             }
 
@@ -87,7 +83,7 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals, Execu
         else
         {
             // only Normal Task
-            currentTask = std::make_shared<NormalTxTask>(f_executeTx, id);
+            currentTask = std::make_shared<NormalTxTask>(executeTxHandler, id);
             m_tasks.push_back(currentTask);
         }
     };
@@ -95,7 +91,7 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals, Execu
         // only DAG Task
         if (!currentTask || currentTask->type() != FlowTask::Type::DAG)
         {
-            currentTask = std::make_shared<DagTxsTask>(f_executeTx);
+            currentTask = std::make_shared<DagTxsTask>(executeTxHandler);
             m_tasks.push_back(currentTask);
         }
 
@@ -105,7 +101,7 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals, Execu
 
     auto onAllConflictHandler = [&](critical::ID id) {
         // only Normal Task
-        currentTask = std::make_shared<NormalTxTask>(f_executeTx, id);
+        currentTask = std::make_shared<NormalTxTask>(executeTxHandler, id);
         m_tasks.push_back(currentTask);
     };
 
