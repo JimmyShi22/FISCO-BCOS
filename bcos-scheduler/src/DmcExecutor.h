@@ -65,7 +65,7 @@ public:
 
     virtual ~DmcExecutor() = default;
 
-    void submit(protocol::ExecutionMessage::UniquePtr message, bool withDAG);
+    virtual void submit(protocol::ExecutionMessage::UniquePtr message, bool withDAG);
     bool prepare();        // return true if has schedule out message
     bool unlockPrepare();  // return true if need to detect deadlock
     void releaseOutdatedLock();
@@ -139,6 +139,8 @@ protected:
         std::function<void(
             bcos::Error::UniquePtr, std::vector<bcos::protocol::ExecutionMessage::UniquePtr>)>
             callback);
+
+    void handleCreateMessage(protocol::ExecutionMessage::UniquePtr& message, int64_t currentSeq);
 
 private:
     MessageHint handleExecutiveMessage(ExecutiveState::Ptr executive);

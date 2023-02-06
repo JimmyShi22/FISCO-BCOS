@@ -63,12 +63,15 @@ void testTxDAG(
 {
     auto startTime = utcSteadyTime();
     cout << endl << name << " test start" << endl;
-    _txDag->init(criticals, [&](ID id) {
+
+    auto executeTxFunc = [&](ID id) {
         if (id % 100000 == 0)
         {
             std::cout << " [" << id << "] ";
         }
-    });
+    };
+    _txDag->setExecuteTxFunc(std::move(executeTxFunc));
+    _txDag->init(criticals);
     auto initTime = utcSteadyTime();
     try
     {
@@ -92,14 +95,17 @@ void runDagTest(shared_ptr<TxDAGInterface> _txDag, int _total,
     // ./test-bcos-executor --run_test=TestTxDAG/TestRun
     CriticalFieldsInterface::Ptr criticals = makeCriticals(_total, _id2CriticalFunc);
 
-    _txDag->init(criticals, [&](ID id) {
+    auto executeTxFunc = [&](ID id) {
         _beforeRunCheck(id);
         if (id % 1000 == 0)
         {
             std::cout << " [" << id << "] ";
         }
         _afterRunCheck(id);
-    });
+    };
+
+    _txDag->setExecuteTxFunc(std::move(executeTxFunc));
+    _txDag->init(criticals);
 
     try
     {

@@ -51,6 +51,9 @@ public:
             _blockFactory, _txPool, _gasLimit, _syncBlock)
     {}
 
+    void ShardingExecute(
+        std::function<void(Error::UniquePtr, protocol::BlockHeader::Ptr, bool)> callback);
+
     void asyncExecute(
         std::function<void(Error::UniquePtr, protocol::BlockHeader::Ptr, bool)> callback) override;
 

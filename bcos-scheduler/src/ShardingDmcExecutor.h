@@ -41,6 +41,10 @@ public:
 
     ~ShardingDmcExecutor() override = default;
 
+    void submit(protocol::ExecutionMessage::UniquePtr message, bool withDAG) override;
+
+    void dagGo(std::function<void(bcos::Error::UniquePtr, Status)> callback);
+
     void go(std::function<void(bcos::Error::UniquePtr, Status)> callback) override;
 
     void executorCall(bcos::protocol::ExecutionMessage::UniquePtr input,
@@ -57,6 +61,8 @@ public:
     void preExecute() override;
 
 private:
+    std::shared_ptr<std::vector<protocol::ExecutionMessage::UniquePtr>> m_preparedMessages =
+        std::make_shared<std::vector<protocol::ExecutionMessage::UniquePtr>>();
     int64_t m_schedulerTermId;
     mutable bcos::SharedMutex x_preExecute;
 };

@@ -315,14 +315,6 @@ public:
             return;
         }
 
-        // Note: copy the inputs here in case of inputs has been released
-        if (!hasNextBlockHeaderDone())
-        {
-            callback(BCOS_ERROR_UNIQUE_PTR(bcos::executor::ExecuteError::SCHEDULER_TERM_ID_ERROR,
-                "Executor has just inited, need to switch"));
-            return;
-        }
-
         auto inputsVec =
             std::make_shared<std::vector<bcos::protocol::ExecutionMessage::UniquePtr>>();
         for (auto i = 0u; i < inputs.size(); i++)

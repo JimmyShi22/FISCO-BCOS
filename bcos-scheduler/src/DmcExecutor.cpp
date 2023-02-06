@@ -313,6 +313,15 @@ void DmcExecutor::handleCreateMessage(ExecutiveState::Ptr executiveState)
         }
     }
 
+    handleCreateMessage(message, executiveState->currentSeq);
+}
+
+void DmcExecutor::handleCreateMessage(
+    protocol::ExecutionMessage::UniquePtr& message, int64_t currentSeq)
+{
+    auto contextID = message->contextID();
+
+
     switch (message->type())
     {
     case protocol::ExecutionMessage::MESSAGE:
@@ -320,7 +329,7 @@ void DmcExecutor::handleCreateMessage(ExecutiveState::Ptr executiveState)
     {
         if (message->to().empty())
         {
-            auto newSeq = executiveState->currentSeq;
+            auto newSeq = currentSeq;
             if (message->createSalt())
             {
                 // TODO: Add sender in this process(consider compat with ethereum)

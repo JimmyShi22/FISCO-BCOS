@@ -26,12 +26,6 @@ void ShardingBlockExecutive::prepare()
 
     SCHEDULER_LOG(TRACE) << BLOCK_NUMBER(number()) << LOG_BADGE("Sharding")
                          << LOG_DESC("dmcExecutor try to preExecute");
-    if (m_hasDAG)
-    {
-        // has dag also need to serialPrepareExecutor
-        serialPrepareExecutor();
-    }
-
     for (auto& dmcExecutor : m_dmcExecutors)
     {
         dmcExecutor.second->preExecute();
@@ -84,15 +78,77 @@ void ShardingBlockExecutive::asyncExecute(
             }
 
             SCHEDULER_LOG(INFO) << BLOCK_NUMBER(number()) << LOG_BADGE("BlockTrace")
-                                << LOG_DESC("DMCExecute begin without DAGExecute");
-            DMCExecute(std::move(callback));
+                                << LOG_DESC("ShardingExecute begin");
+            ShardingExecute(std::move(callback));
         });
     }
     else
     {
         SCHEDULER_LOG(TRACE) << BLOCK_NUMBER(number()) << LOG_BADGE("BlockTrace")
                              << LOG_DESC("DMCExecute begin for call");
-        DMCExecute(std::move(callback));
+        ShardingExecute(std::move(callback));
+    }
+}
+
+void ShardingBlockExecutive::ShardingExecute(
+    std::function<void(Error::UniquePtr, protocol::BlockHeader::Ptr, bool)> callback)
+{
+    auto batchStatus = std::make_shared<BatchStatus>();
+    batchStatus->total = m_dmcExecutors.size();
+    auto startT = utcTime();
+    for (auto& dmcExecutor : m_dmcExecutors)
+    {
+        std::dynamic_pointer_cast<ShardingDmcExecutor>(dmcExecutor.second)
+            ->dagGo([this, startT, batchStatus, callback = std::move(callback)](
+                        bcos::Error::UniquePtr error, DmcExecutor::Status status) {
+                if (error || status == DmcExecutor::Status::ERROR)
+                {
+                    batchStatus->error++;
+                    batchStatus->errorMessage = error.get()->errorMessage();
+                    SCHEDULER_LOG(ERROR)
+                        << BLOCK_NUMBER(number()) << LOG_BADGE("ShardingExecutor")
+                        << "dagGo() with error" << LOG_KV("code", error ? error->errorCode() : -1)
+                        << LOG_KV("msg", error ? error.get()->errorMessage() : "null");
+                }
+                else
+                {
+                    batchStatus->finished++;
+                }
+
+                // check batch
+                if ((batchStatus->error + batchStatus->paused + batchStatus->finished) !=
+                    batchStatus->total)
+                {
+                    return;
+                }
+
+                // block many threads
+                if (batchStatus->callbackExecuted)
+                {
+                    return;
+                }
+                {
+                    WriteGuard lock(batchStatus->x_lock);
+                    if (batchStatus->callbackExecuted)
+                    {
+                        return;
+                    }
+                    batchStatus->callbackExecuted = true;
+                }
+
+                if (!m_isRunning)
+                {
+                    callback(
+                        BCOS_ERROR_UNIQUE_PTR(SchedulerError::Stopped, "BlockExecutive is stopped"),
+                        nullptr, m_isSysBlock);
+                    return;
+                }
+
+                SCHEDULER_LOG(INFO) << BLOCK_NUMBER(number()) << LOG_DESC("DAGExecute success")
+                                    << LOG_KV("dagExecuteT", (utcTime() - startT));
+
+                DMCExecute(std::move(callback));
+            });
     }
 }
 
