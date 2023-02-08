@@ -76,7 +76,7 @@ void ShardingTransactionExecutor::executeTransactions(std::string contractAddres
             auto dagExecutiveFlow = std::dynamic_pointer_cast<ExecutiveDagFlow>(executiveFlow);
             {
                 // waiting cache initialize finish
-                EXECUTOR_NAME_LOG(TRACE)
+                EXECUTOR_NAME_LOG(DEBUG)
                     << LOG_BADGE("preExeBlock") << " waiting for dagFlow cache preparing"
                     << LOG_KV("number", number) << LOG_KV("timestamp", timestamp)
                     << LOG_KV("codeAddress", contractAddress);
@@ -93,12 +93,13 @@ void ShardingTransactionExecutor::executeTransactions(std::string contractAddres
 
             auto recoredT = utcTime();
             asyncExecuteExecutiveFlow(executiveFlow,
-                [callback = std::move(callback)](bcos::Error::UniquePtr&& error,
+                [this, recoredT, callback = std::move(callback)](bcos::Error::UniquePtr&& error,
                     std::vector<bcos::protocol::ExecutionMessage::UniquePtr>&& messages) {
+                    EXECUTOR_NAME_LOG(DEBUG)
+                        << LOG_DESC("ShardingTransactionExecutor execute transaction finish")
+                        << LOG_KV("cost", (utcTime() - recoredT));
                     callback(std::move(error), std::move(messages));
                 });
-            EXECUTOR_NAME_LOG(DEBUG) << LOG_DESC("ShardingTransactionExecutor execute transaction")
-                                     << LOG_KV("cost", (utcTime() - recoredT));
         } while (false);
     }
     else
@@ -324,7 +325,7 @@ void ShardingTransactionExecutor::preExecuteTransactions(int64_t schedulerTermId
 
                     auto executiveFlow = std::dynamic_pointer_cast<ExecutiveDagFlow>(
                         getExecutiveFlow(blockContext, contractAddress, true, false));
-                    auto dagFlow = executiveFlow->prepareDagFlow(
+                    auto dagFlow = ExecutiveDagFlow::prepareDagFlow(
                         *blockContext, executiveFactory, *callParametersList, m_abiCache);
                     {
                         WriteGuard l(x_preparedCache);

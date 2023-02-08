@@ -109,7 +109,7 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
     try
     {
         auto contextID =
-            m_pausedExecutive ? m_pausedExecutive->getContextID() : m_inputs->begin()->first;
+            m_pausedExecutive ? m_pausedExecutive->getContextID() : (*m_inputs)[0]->contextID;
         for (; contextID < (int64_t)m_inputs->size(); contextID++)
         {
             if (!m_isRunning)
@@ -125,10 +125,9 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
             ExecutiveState::Ptr executiveState;
             if (!m_pausedExecutive)
             {
-                auto& txInput = m_inputs[contextID];
+                auto& txInput = (*m_inputs)[contextID];
                 executiveState =
                     std::make_shared<ExecutiveState>(m_executiveFactory, std::move(txInput));
-                m_inputs->erase(contextID);
             }
             else
             {
@@ -184,6 +183,7 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
         m_dagFlow->setExecuteTxFunc([this](ID id) {
             try
             {
+                DAGFLOW_LOG(DEBUG) << LOG_DESC("Execute tx: start") << LOG_KV("id", id);
                 if (!m_isRunning)
                 {
                     return;
@@ -192,7 +192,7 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
                 CallParameters::UniquePtr output;
                 bool isDagTx = m_dagFlow->isDagTx(id);
 
-                if (isDagTx)
+                if (isDagTx) [[likely]]
                 {
                     auto& input = (*m_inputs)[id];
                     DAGFLOW_LOG(TRACE) << LOG_DESC("Execute tx: start DAG tx") << input->toString()
@@ -204,13 +204,6 @@ void ExecutiveDagFlow::run(std::function<void(CallParameters::UniquePtr)> onTxRe
                         input->codeAddress, input->contextID, input->seq, false);
 
                     output = executive->start(std::move(input));
-
-                    if (output->type == CallParameters::MESSAGE)
-                    {
-                        DAGFLOW_LOG(DEBUG) << LOG_BADGE("call/deploy in dag")
-                                           << LOG_KV("senderAddress", output->senderAddress)
-                                           << LOG_KV("codeAddress", output->codeAddress);
-                    }
 
                     DAGFLOW_LOG(DEBUG) << "execute tx finish DAG " << output->toString();
                 }
@@ -620,7 +613,7 @@ std::shared_ptr<std::vector<bytes>> ExecutiveDagFlow::extractConflictFields(
                 auto bytes = static_cast<bcos::byte*>(static_cast<void*>(&blockNumber));
                 criticalKey.insert(criticalKey.end(), bytes, bytes + sizeof(blockNumber));
 
-                DAGFLOW_LOG(DEBUG)
+                DAGFLOW_LOG(TRACE)
                     << LOG_BADGE("extractConflictFields") << LOG_DESC("use `BlockNumber`")
                     << LOG_KV("functionName", functionAbi.name)
                     << LOG_KV("blockNumber", blockNumber);
@@ -630,7 +623,7 @@ std::shared_ptr<std::vector<bytes>> ExecutiveDagFlow::extractConflictFields(
             {
                 criticalKey.insert(criticalKey.end(), to.begin(), to.end());
 
-                DAGFLOW_LOG(DEBUG) << LOG_BADGE("extractConflictFields") << LOG_DESC("use `Addr`")
+                DAGFLOW_LOG(TRACE) << LOG_BADGE("extractConflictFields") << LOG_DESC("use `Addr`")
                                    << LOG_KV("addr", to);
                 break;
             }
@@ -693,7 +686,7 @@ std::shared_ptr<std::vector<bytes>> ExecutiveDagFlow::extractConflictFields(
                 criticalKey.insert(criticalKey.end(), out.begin(), out.end());
             }
 
-            DAGFLOW_LOG(DEBUG) << LOG_BADGE("extractConflictFields") << LOG_DESC("use `Params`")
+            DAGFLOW_LOG(TRACE) << LOG_BADGE("extractConflictFields") << LOG_DESC("use `Params`")
                                << LOG_KV("functionName", functionAbi.name)
                                << LOG_KV("criticalKey", toHexStringWithPrefix(criticalKey));
             break;
@@ -702,14 +695,14 @@ std::shared_ptr<std::vector<bytes>> ExecutiveDagFlow::extractConflictFields(
         {
             criticalKey.insert(
                 criticalKey.end(), conflictField.value.begin(), conflictField.value.end());
-            DAGFLOW_LOG(DEBUG) << LOG_BADGE("extractConflictFields") << LOG_DESC("use `Const`")
+            DAGFLOW_LOG(TRACE) << LOG_BADGE("extractConflictFields") << LOG_DESC("use `Const`")
                                << LOG_KV("functionName", functionAbi.name)
                                << LOG_KV("criticalKey", toHexStringWithPrefix(criticalKey));
             break;
         }
         case None:
         {
-            DAGFLOW_LOG(DEBUG) << LOG_BADGE("extractConflictFields") << LOG_DESC("use `None`")
+            DAGFLOW_LOG(TRACE) << LOG_BADGE("extractConflictFields") << LOG_DESC("use `None`")
                                << LOG_KV("functionName", functionAbi.name)
                                << LOG_KV("criticalKey", toHexStringWithPrefix(criticalKey));
             break;

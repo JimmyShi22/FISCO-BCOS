@@ -65,6 +65,8 @@ public:
         bcos::executor::ParallelTransactionExecutorInterface::Ptr executor) override;
 
 private:
+    bool needPrepareExecutor() override { return false; }
+
     std::string getContractShard(const std::string& contractAddress);
 
     mutable bcos::SharedMutex x_contract2Shard;

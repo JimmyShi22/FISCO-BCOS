@@ -31,6 +31,7 @@ namespace bcos
 namespace executor
 {
 
+
 class FlowTask
 {
 public:
@@ -110,6 +111,7 @@ private:
     void runExecuteTxFunc(uint32_t id) { f_executeTx(id); }
 
     ExecuteTxFunc f_executeTx;
+
     std::vector<FlowTask::Ptr> m_tasks;
     critical::CriticalFieldsInterface::Ptr m_txsCriticals;
     size_t currentTaskItr = 0;

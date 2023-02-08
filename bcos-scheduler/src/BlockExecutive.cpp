@@ -77,7 +77,7 @@ void BlockExecutive::prepare()
     }
 
     // prepare all executors
-    if (!m_hasDAG)
+    if (needPrepareExecutor())
     {
         // prepare DMC executor
         serialPrepareExecutor();
@@ -1092,7 +1092,7 @@ void BlockExecutive::onExecuteFinish(
             auto executedBlockHeader =
                 m_blockFactory->blockHeaderFactory()->populateBlockHeader(m_block->blockHeader());
             executedBlockHeader->setStateRoot(hash);
-            executedBlockHeader->setGasUsed(m_gasUsed);
+            executedBlockHeader->setGasUsed(m_gasUsed.load());
             executedBlockHeader->setTxsRoot(m_block->calculateTransactionRoot(*m_hashImpl));
             executedBlockHeader->setReceiptsRoot(m_block->calculateReceiptRoot(*m_hashImpl));
             executedBlockHeader->calculateHash(*m_hashImpl);
@@ -1570,7 +1570,7 @@ void BlockExecutive::onTxFinish(bcos::protocol::ExecutionMessage::UniquePtr outp
     {
         txGasUsed = 0;
     }
-    m_gasUsed += txGasUsed;
+    m_gasUsed.fetch_add(txGasUsed);
     auto receipt = m_scheduler->m_blockFactory->receiptFactory()->createReceipt(txGasUsed,
         std::string(output->newEVMContractAddress()), output->takeLogEntries(), output->status(),
         output->data(), m_block->blockHeaderConst()->number());

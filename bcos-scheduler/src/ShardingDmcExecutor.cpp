@@ -4,6 +4,8 @@
 
 #include "ShardingDmcExecutor.h"
 #include <bcos-framework/executor/ExecuteError.h>
+#include <tbb/parallel_for.h>
+
 using namespace bcos::scheduler;
 
 void ShardingDmcExecutor::submit(protocol::ExecutionMessage::UniquePtr message, bool withDAG)
@@ -101,18 +103,37 @@ void ShardingDmcExecutor::dagGo(std::function<void(bcos::Error::UniquePtr, Statu
                 }
                 else
                 {
-                    for (auto& output : outputs)
-                    {
-                        if (output->type() == protocol::ExecutionMessage::FINISHED ||
-                            output->type() == protocol::ExecutionMessage::REVERT)
-                        {
-                            f_onTxFinished(std::move(output));
-                        }
-                        else
-                        {
-                            DmcExecutor::submit(std::move(output), false);
-                        }
-                    }
+                    tbb::parallel_for(tbb::blocked_range<size_t>(0, outputs.size()),
+                        [this, &outputs](const tbb::blocked_range<size_t>& range) {
+                            for (size_t i = range.begin(); i != range.end(); ++i)
+                            {
+                                auto& output = outputs[i];
+                                if (output->type() == protocol::ExecutionMessage::FINISHED ||
+                                    output->type() == protocol::ExecutionMessage::REVERT)
+                                {
+                                    f_onTxFinished(std::move(output));
+                                }
+                                else
+                                {
+                                    DmcExecutor::submit(std::move(output), false);
+                                }
+                            }
+                        });
+                    /*
+                                        for (auto& output : outputs)
+                                        {
+                                            if (output->type() ==
+                       protocol::ExecutionMessage::FINISHED || output->type() ==
+                       protocol::ExecutionMessage::REVERT)
+                                            {
+                                                f_onTxFinished(std::move(output));
+                                            }
+                                            else
+                                            {
+                                                DmcExecutor::submit(std::move(output), false);
+                                            }
+                                        }
+                                        */
                     callback(nullptr, Status::FINISHED);
                 }
             });

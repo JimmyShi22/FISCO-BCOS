@@ -122,6 +122,8 @@ protected:
     void batchBlockCommit(uint64_t rollbackVersion, std::function<void(Error::UniquePtr)> callback);
     void batchBlockRollback(uint64_t version, std::function<void(Error::UniquePtr)> callback);
 
+    virtual bool needPrepareExecutor() { return !m_hasDAG; }
+
     struct BatchStatus  // Batch state per batch
     {
         using Ptr = std::shared_ptr<BatchStatus>;
@@ -170,7 +172,7 @@ protected:
 
     std::vector<ExecutiveResult> m_executiveResults;
 
-    size_t m_gasUsed = 0;
+    std::atomic<size_t> m_gasUsed = 0;
 
     GraphKeyLocks::Ptr m_keyLocks = std::make_shared<GraphKeyLocks>();
 
