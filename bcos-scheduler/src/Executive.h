@@ -39,6 +39,7 @@ using ExecutiveStates = std::shared_ptr<std::vector<ExecutiveState::Ptr>>;
 struct ExecutiveResult
 {
     using Ptr = std::shared_ptr<ExecutiveResult>;
+    bcos::protocol::ExecutionMessage::UniquePtr output;
     bcos::protocol::TransactionReceipt::Ptr receipt;
     bcos::crypto::HashType transactionHash;
     std::string source;

@@ -1069,6 +1069,7 @@ void BlockExecutive::onExecuteFinish(
 
     if (m_staticCall)
     {
+        generateReceipts();
         // Set result to m_block
         for (size_t i = 0; i < m_executiveResults.size(); i++)
         {
@@ -1103,6 +1104,8 @@ void BlockExecutive::onExecuteFinish(
                 callback(std::move(error), nullptr, m_isSysBlock);
                 return;
             }
+
+            generateReceipts();
 
             m_hashElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now() - m_currentTimePoint);
@@ -1594,25 +1597,41 @@ void BlockExecutive::scheduleExecutive(ExecutiveState::Ptr executiveState)
 
 void BlockExecutive::onTxFinish(bcos::protocol::ExecutionMessage::UniquePtr output)
 {
-    auto txGasUsed = m_gasLimit - output->gasAvailable();
-    // Calc the gas set to header
-    if (bcos::precompiled::c_systemTxsAddress.find(output->from()) !=
-        bcos::precompiled::c_systemTxsAddress.end())
-    {
-        txGasUsed = 0;
-    }
-    m_gasUsed.fetch_add(txGasUsed);
-    auto receipt = m_scheduler->m_blockFactory->receiptFactory()->createReceipt(txGasUsed,
-        std::string(output->newEVMContractAddress()), output->takeLogEntries(), output->status(),
-        output->data(), m_block->blockHeaderConst()->number());
+    m_executiveResults[output->contextID() - m_startContextID].output = std::move(output);
+}
 
-    // write receipt in results
-    SCHEDULER_LOG(TRACE) << " 6.GenReceipt:\t [^^] " << output->toString()
-                         << " -> contextID:" << output->contextID() - m_startContextID
-                         << ", receipt: " << receipt->hash() << ", gasUsed: " << receipt->gasUsed()
-                         << ", version: " << receipt->version()
-                         << ", status: " << receipt->status();
-    m_executiveResults[output->contextID() - m_startContextID].receipt = std::move(receipt);
+void BlockExecutive::generateReceipts()
+{
+    tbb::parallel_for(
+        tbb::blocked_range<size_t>(0U, m_executiveResults.size()), [&](auto const& range) {
+            for (auto i = range.begin(); i < range.end(); ++i)
+            {
+                auto output = std::move(m_executiveResults[i].output);
+
+                auto txGasUsed = m_gasLimit - output->gasAvailable();
+                // Calc the gas set to header
+                if (bcos::precompiled::c_systemTxsAddress.find(output->from()) !=
+                    bcos::precompiled::c_systemTxsAddress.end())
+                {
+                    txGasUsed = 0;
+                }
+                m_gasUsed.fetch_add(txGasUsed);
+
+                auto receipt =
+                    m_scheduler->m_blockFactory->receiptFactory()->createReceipt(txGasUsed,
+                        std::string(output->newEVMContractAddress()), output->takeLogEntries(),
+                        output->status(), output->data(), m_block->blockHeaderConst()->number());
+
+                // write receipt in results
+                SCHEDULER_LOG(TRACE)
+                    << " 6.GenReceipt:\t [^^] " << output->toString()
+                    << " -> contextID:" << output->contextID() - m_startContextID
+                    << ", receipt: " << receipt->hash() << ", gasUsed: " << receipt->gasUsed()
+                    << ", version: " << receipt->version() << ", status: " << receipt->status();
+                m_executiveResults[output->contextID() - m_startContextID].receipt =
+                    std::move(receipt);
+            }
+        });
 }
 
 

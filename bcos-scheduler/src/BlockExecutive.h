@@ -155,6 +155,7 @@ protected:
         bcos::executor::ParallelTransactionExecutorInterface::Ptr executor);
     void scheduleExecutive(ExecutiveState::Ptr executiveState);
     void onTxFinish(bcos::protocol::ExecutionMessage::UniquePtr output);
+    void generateReceipts();
     void onDmcExecuteFinish(
         std::function<void(Error::UniquePtr, protocol::BlockHeader::Ptr, bool)> callback);
     virtual void onExecuteFinish(
