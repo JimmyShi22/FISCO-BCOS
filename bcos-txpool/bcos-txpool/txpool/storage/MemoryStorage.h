@@ -177,5 +177,6 @@ protected:
 
     RateReporter m_inRateReporter;
     RateReporter m_sealRateReporter;
+    RateReporter m_removeRateReporter;
 };
 }  // namespace bcos::txpool

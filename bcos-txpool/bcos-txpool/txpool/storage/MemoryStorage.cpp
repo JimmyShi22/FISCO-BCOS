@@ -40,7 +40,8 @@ MemoryStorage::MemoryStorage(
     m_txsTable(256),
     m_txsExpirationTime(_txsExpirationTime),
     m_inRateReporter("tx_pool_in", 1000),
-    m_sealRateReporter("tx_pool_seal", 1000)
+    m_sealRateReporter("tx_pool_seal", 1000),
+    m_removeRateReporter("tx_pool_rm", 1000)
 {
     m_blockNumberUpdatedTime = utcTime();
     // Trigger a transaction cleanup operation every 3s
@@ -483,6 +484,7 @@ void MemoryStorage::batchRemove(BlockNumber batchId, TransactionSubmitResults co
     {
         if (tx)
         {
+            m_removeRateReporter.update(1, true);
             notifyTxResult(*tx, std::move(txResult));
         }
     }
