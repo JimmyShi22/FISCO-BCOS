@@ -647,6 +647,7 @@ void MemoryStorage::batchFetchTxs(Block::Ptr _txsList, Block::Ptr _sysTxsList, s
         tx->setSealed(true);
         tx->setBatchId(-1);
         tx->setBatchHash(HashType());
+        m_knownLatestSealedTxHash = txHash;
         m_sealRateReporter.update(1, true);
     };
 
@@ -675,18 +676,38 @@ void MemoryStorage::batchFetchTxs(Block::Ptr _txsList, Block::Ptr _sysTxsList, s
     }
     else
     {
-        m_txsTable.forEach<TxsMap::ReadAccessor>([&](TxsMap::ReadAccessor::Ptr accessor) {
-            const auto& tx = accessor->value();
+        if (_avoidDuplicate)
+        {
+            m_txsTable.forEach<TxsMap::ReadAccessor>(
+                m_knownLatestSealedTxHash, [&](TxsMap::ReadAccessor::Ptr accessor) {
+                    const auto& tx = accessor->value();
 
-            handleTx(tx);
+                    handleTx(tx);
 
-            if ((_txsList->transactionsMetaDataSize() + _sysTxsList->transactionsMetaDataSize()) >=
-                _txsLimit)
-            {
-                return false;
-            }
-            return true;
-        });
+                    if ((_txsList->transactionsMetaDataSize() +
+                            _sysTxsList->transactionsMetaDataSize()) >= _txsLimit)
+                    {
+                        return false;
+                    }
+                    return true;
+                });
+        }
+        else
+        {
+            m_txsTable.forEach<TxsMap::ReadAccessor>([&](TxsMap::ReadAccessor::Ptr accessor) {
+                const auto& tx = accessor->value();
+
+                handleTx(tx);
+
+                if ((_txsList->transactionsMetaDataSize() +
+                        _sysTxsList->transactionsMetaDataSize()) >= _txsLimit)
+                {
+                    return false;
+                }
+                return true;
+            });
+        }
+
 
         notifyUnsealedTxsSize();
         removeInvalidTxs(true);
@@ -786,13 +807,6 @@ HashListPtr MemoryStorage::filterUnknownTxs(HashList const& _txsHashList, NodeID
 void MemoryStorage::batchMarkTxs(
     HashList const& _txsHashList, BlockNumber _batchId, HashType const& _batchHash, bool _sealFlag)
 {
-    if (_sealFlag)
-    {
-        batchMarkTxsWithoutLock(_txsHashList, _batchId, _batchHash, _sealFlag);
-        return;
-    }
-    // Note: setting flag to false is pessimistic, use writeLock here in case of the same txs has
-    // been sealed twice
     batchMarkTxsWithoutLock(_txsHashList, _batchId, _batchHash, _sealFlag);
 }
 
@@ -842,6 +856,7 @@ void MemoryStorage::batchMarkTxsWithoutLock(
         {
             tx->setBatchId(_batchId);
             tx->setBatchHash(_batchHash);
+            m_knownLatestSealedTxHash = txHash;
         }
 #if FISCO_DEBUG
         // TODO: remove this, now just for bug tracing

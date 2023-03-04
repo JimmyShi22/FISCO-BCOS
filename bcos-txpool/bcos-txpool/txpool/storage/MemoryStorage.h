@@ -178,5 +178,7 @@ protected:
     RateReporter m_inRateReporter;
     RateReporter m_sealRateReporter;
     RateReporter m_removeRateReporter;
+
+    bcos::crypto::HashType m_knownLatestSealedTxHash;
 };
 }  // namespace bcos::txpool

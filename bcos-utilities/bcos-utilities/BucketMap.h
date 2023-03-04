@@ -21,6 +21,7 @@
 
 #include "Common.h"
 #include <map>
+#include <unordered_map>
 
 namespace bcos
 {
@@ -30,7 +31,7 @@ class Bucket
 {
 public:
     using Ptr = std::shared_ptr<Bucket>;
-    using MapType = std::map<KeyType, ValueType>;
+    using MapType = std::unordered_map<KeyType, ValueType>;
 
     Bucket() = default;
     Bucket(const Bucket&) = default;
@@ -97,7 +98,7 @@ public:
         return inserted;
     }
 
-    // return nullptr if not exists before remove
+    // return {} if not exists before remove
     ValueType remove(const KeyType& key)
     {
         bcos::WriteGuard guard(m_mutex);
@@ -201,11 +202,24 @@ public:
             m_buckets[i] = std::make_shared<Bucket<KeyType, ValueType>>();
         }
     }
-
     template <class AccessorType>  // handler return isContinue
     void forEach(std::function<bool(typename AccessorType::Ptr)> handler)
     {
-        auto x = utcTimeUs();
+        forEach<AccessorType>(std::rand() % m_buckets.size(), std::move(handler));
+    }
+
+    template <class AccessorType>  // handler return isContinue
+    void forEach(const KeyType& startAfter, std::function<bool(typename AccessorType::Ptr)> handler)
+    {
+        size_t startIdx = (getBucketIndex(startAfter) + 1) % m_buckets.size();
+        forEach<AccessorType>(startIdx, std::move(handler));
+    }
+
+    template <class AccessorType>  // handler return isContinue
+    void forEach(size_t startIdx, std::function<bool(typename AccessorType::Ptr)> handler)
+    {
+        size_t x = startIdx;
+
         size_t limit = m_buckets.size();
         while (limit-- > 0)
         {
