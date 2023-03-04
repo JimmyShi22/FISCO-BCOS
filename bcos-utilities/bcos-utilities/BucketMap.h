@@ -97,18 +97,28 @@ public:
         return inserted;
     }
 
-    void remove(const KeyType& key)
+    // return nullptr if not exists before remove
+    ValueType remove(const KeyType& key)
     {
         bcos::WriteGuard guard(m_mutex);
-        m_values.erase(key);
+
+        auto it = m_values.find(key);
+        if (it == m_values.end())
+        {
+            return {};
+        }
+
+        ValueType ret = std::move(it->second);
+        m_values.erase(it);
+        return ret;
     }
 
     size_t size() { return m_values.size(); }
     bool contains(const KeyType& key) { return m_values.contains(key); }
 
-
+    // return true if need continue
     template <class AccessorType>  // handler return isContinue
-    void forEach(std::function<bool(typename AccessorType::Ptr)> handler)
+    bool forEach(std::function<bool(typename AccessorType::Ptr)> handler)
     {
         typename AccessorType::Ptr accessor =
             std::make_shared<AccessorType>(m_mutex);  // acquire lock here
@@ -117,9 +127,10 @@ public:
             accessor->setValue(it);
             if (!handler(accessor))
             {
-                break;
+                return false;
             }
         }
+        return true;
     }
 
 private:
@@ -127,7 +138,7 @@ private:
     mutable SharedMutex m_mutex;
 };
 
-template <class KeyType, class ValueType, class BucketHasher>
+template <class KeyType, class ValueType, class BucketHasher = std::hash<KeyType>>
 class BucketMap
 {
 public:
@@ -150,7 +161,7 @@ public:
     bool find(typename AccessorType::Ptr& accessor, const KeyType& key)
     {
         auto idx = getBucketIndex(key);
-        return m_buckets[idx]->find(accessor, key);
+        return m_buckets[idx]->template find<AccessorType>(accessor, key);
     }
 
     bool insert(typename WriteAccessor::Ptr& accessor, std::pair<KeyType, ValueType> kv)
@@ -159,13 +170,13 @@ public:
         return m_buckets[idx]->insert(accessor, std::move(kv));
     }
 
-    void remove(const KeyType& key)
+    ValueType remove(const KeyType& key)
     {
         auto idx = getBucketIndex(key);
-        m_buckets[idx]->remove(key);
+        return m_buckets[idx]->remove(key);
     }
 
-    size_t size()
+    size_t size() const
     {
         size_t size = 0;
         for (auto& bucket : m_buckets)
@@ -175,10 +186,20 @@ public:
         return size;
     }
 
+    bool empty() const { return size() == 0; }
+
     bool contains(const KeyType& key)
     {
         auto idx = getBucketIndex(key);
-        m_buckets[idx]->contains(key);
+        return m_buckets[idx]->contains(key);
+    }
+
+    void clear()
+    {
+        for (size_t i = 0; i < m_buckets.size(); i++)
+        {
+            m_buckets[i] = std::make_shared<Bucket<KeyType, ValueType>>();
+        }
     }
 
     template <class AccessorType>  // handler return isContinue
@@ -189,7 +210,10 @@ public:
         while (limit-- > 0)
         {
             auto idx = x++ % m_buckets.size();
-            m_buckets[idx]->template forEach<AccessorType>(handler);
+            if (!m_buckets[idx]->template forEach<AccessorType>(handler))
+            {
+                break;
+            }
         }
     }
 
