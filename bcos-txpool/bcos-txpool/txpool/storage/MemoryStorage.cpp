@@ -159,12 +159,14 @@ TransactionStatus MemoryStorage::enforceSubmitTransaction(Transaction::Ptr _tx)
     // the transaction has already onChain, reject it
     {
         auto result = m_config->txValidator()->submittedToChain(_tx);
-        TxsMap::ReadAccessor::Ptr accessor;
-        auto has = m_txsTable.find<TxsMap::ReadAccessor>(accessor, txHash);
         Transaction::ConstPtr tx = nullptr;
-        if (has)
         {
-            tx = accessor->value();
+            TxsMap::ReadAccessor::Ptr accessor;
+            auto has = m_txsTable.find<TxsMap::ReadAccessor>(accessor, txHash);
+            if (has)
+            {
+                tx = accessor->value();
+            }
         }
         if (result == TransactionStatus::NonceCheckFail)
         {
@@ -212,10 +214,13 @@ TransactionStatus MemoryStorage::enforceSubmitTransaction(Transaction::Ptr _tx)
     auto status = insertWithoutLock(_tx);
     if (status != TransactionStatus::None)
     {
-        TxsMap::ReadAccessor::Ptr accessor;
-        auto has = m_txsTable.find<TxsMap::ReadAccessor>(accessor, _tx->hash());
-        assert(has);  // assume must has
-        auto tx = accessor->value();
+        Transaction::Ptr tx;
+        {
+            TxsMap::ReadAccessor::Ptr accessor;
+            auto has = m_txsTable.find<TxsMap::ReadAccessor>(accessor, _tx->hash());
+            assert(has);  // assume must has
+            tx = accessor->value();
+        }
         TXPOOL_LOG(WARNING) << LOG_DESC("insertWithoutLock failed for already has the tx")
                             << LOG_KV("hash", tx->hash().abridged())
                             << LOG_KV("status", tx->sealed());
@@ -304,11 +309,13 @@ TransactionStatus MemoryStorage::insert(Transaction::Ptr transaction)
 
 TransactionStatus MemoryStorage::insertWithoutLock(Transaction::Ptr transaction)
 {
-    TxsMap::WriteAccessor::Ptr accessor;
-    auto inserted = m_txsTable.insert(accessor, {transaction->hash(), transaction});
-    if (!inserted)
     {
-        return TransactionStatus::AlreadyInTxPool;
+        TxsMap::WriteAccessor::Ptr accessor;
+        auto inserted = m_txsTable.insert(accessor, {transaction->hash(), transaction});
+        if (!inserted)
+        {
+            return TransactionStatus::AlreadyInTxPool;
+        }
     }
     // m_tx2Seal.push(transaction);
     m_onReady();
@@ -794,16 +801,19 @@ void MemoryStorage::batchMarkTxsWithoutLock(
     ssize_t successCount = 0;
     for (auto const& txHash : _txsHashList)
     {
-        // TODO: use batchFind
-        TxsMap::ReadAccessor::Ptr accessor;
-        auto has = m_txsTable.find<TxsMap::ReadAccessor>(accessor, txHash);
-        if (!has)
-        {
-            TXPOOL_LOG(TRACE) << LOG_DESC("batchMarkTxs: missing transaction")
-                              << LOG_KV("tx", txHash.abridged()) << LOG_KV("sealFlag", _sealFlag);
-            continue;
+        Transaction::Ptr tx;
+        {  // TODO: use batchFind
+            TxsMap::ReadAccessor::Ptr accessor;
+            auto has = m_txsTable.find<TxsMap::ReadAccessor>(accessor, txHash);
+            if (!has)
+            {
+                TXPOOL_LOG(TRACE) << LOG_DESC("batchMarkTxs: missing transaction")
+                                  << LOG_KV("tx", txHash.abridged())
+                                  << LOG_KV("sealFlag", _sealFlag);
+                continue;
+            }
+            tx = accessor->value();
         }
-        auto tx = accessor->value();
         if (!tx)
         {
             continue;
