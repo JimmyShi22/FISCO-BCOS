@@ -57,7 +57,7 @@ public:
         m_isWasm(isWasm),
         m_isSerialExecute(isSerialExecute),
         m_schedulerTermId(schedulerTermId),
-        m_worker("scheduler", 1)
+        m_worker("scheduler", 8)
     {
         start();
     }
