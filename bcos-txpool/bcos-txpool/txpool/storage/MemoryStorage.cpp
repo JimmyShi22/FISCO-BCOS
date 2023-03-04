@@ -49,6 +49,7 @@ MemoryStorage::MemoryStorage(
     m_cleanUpTimer->registerTimeoutHandler([this] { cleanUpExpiredTransactions(); });
     m_inRateReporter.start();
     m_sealRateReporter.start();
+    m_removeRateReporter.start();
     m_tx2Seal.set_capacity(m_config->poolLimit());
     TXPOOL_LOG(INFO) << LOG_DESC("init MemoryStorage of txpool")
                      << LOG_KV("txNotifierWorkerNum", _notifyWorkerNum)
@@ -439,6 +440,7 @@ void MemoryStorage::batchRemove(BlockNumber batchId, TransactionSubmitResults co
             else if (tx)
             {
                 ++succCount;
+                m_removeRateReporter.update(1, true);
                 nonceList.emplace_back(tx->nonce());
             }
             results.emplace_back(std::move(tx), txResult);
@@ -484,7 +486,6 @@ void MemoryStorage::batchRemove(BlockNumber batchId, TransactionSubmitResults co
     {
         if (tx)
         {
-            m_removeRateReporter.update(1, true);
             notifyTxResult(*tx, std::move(txResult));
         }
     }
