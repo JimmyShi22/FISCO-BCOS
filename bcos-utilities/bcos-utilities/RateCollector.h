@@ -50,7 +50,7 @@ public:
     using Ptr = std::shared_ptr<RateCollector>;
     using ConstPtr = std::shared_ptr<const RateCollector>;
 
-    RateCollector(std::string _moduleName, uint64_t _intervalMS)
+    RateCollector(std::string _moduleName, uint64_t _intervalMS, bool startRightNow = false)
       : m_moduleName(std::move(_moduleName)), m_intervalMS(_intervalMS)
     {
         m_reportTimer = std::make_shared<Timer>(_intervalMS, _moduleName);
@@ -59,6 +59,11 @@ public:
             flush();
             m_reportTimer->restart();
         });
+
+        if (startRightNow)
+        {
+            start();
+        }
     }
 
     ~RateCollector() { stop(); }

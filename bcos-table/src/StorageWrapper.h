@@ -28,18 +28,8 @@ class StorageWrapper
 {
 public:
     StorageWrapper(storage::StateStorageInterface::Ptr storage, bcos::storage::Recoder::Ptr recoder)
-      : m_storage(std::move(storage)),
-        m_recoder(std::move(recoder)),
-        m_openTableRateCollector("open_table_rate_collector", 1000),
-        m_createTableRateCollector("create_table_rate_collector", 1000),
-        m_getTableRateCollector("get_row_rate_collector", 1000),
-        m_setTableRateCollector("set_row_table_rate_collector", 1000)
-    {
-        m_openTableRateCollector.start();
-        m_createTableRateCollector.start();
-        m_getTableRateCollector.start();
-        m_setTableRateCollector.start();
-    }
+      : m_storage(std::move(storage)), m_recoder(std::move(recoder))
+    {}
 
     StorageWrapper(const StorageWrapper&) = delete;
     StorageWrapper(StorageWrapper&&) = delete;
@@ -234,7 +224,8 @@ private:
 
     EntryCachePtr m_codeCache;
     EntryCachePtr m_codeHashCache;
-    bcos::RateCollector m_openTableRateCollector, m_createTableRateCollector,
+
+    static bcos::RateCollector m_openTableRateCollector, m_createTableRateCollector,
         m_getTableRateCollector, m_setTableRateCollector;
 };
 }  // namespace bcos::storage
