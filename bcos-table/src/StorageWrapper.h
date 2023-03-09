@@ -4,6 +4,7 @@
 #include "bcos-framework/storage/StorageInterface.h"
 #include "bcos-framework/storage/Table.h"
 #include "bcos-table/src/StateStorage.h"
+#include <bcos-utilities/RateCollector.h>
 #include <tbb/concurrent_unordered_map.h>
 #include <boost/iterator/iterator_categories.hpp>
 #include <boost/throw_exception.hpp>
@@ -80,6 +81,8 @@ public:
     virtual std::optional<storage::Entry> getRow(
         const std::string_view& table, const std::string_view& _key)
     {
+        m_getTableRateCollector.update(1, true);
+
         if (m_codeCache && table.compare(M_SYS_CODE_BINARY) == 0)
         {
             auto it = m_codeCache->find(std::string(_key));
@@ -123,6 +126,7 @@ public:
             RANGES::category::input | RANGES::category::random_access | RANGES::category::sized>
             keys)
     {
+        m_getTableRateCollector.update(keys.size(), true);
         GetRowsResponse value;
         m_storage->asyncGetRows(table, keys, [&value](auto&& error, auto&& entries) mutable {
             value = {std::move(error), std::move(entries)};
@@ -142,6 +146,7 @@ public:
     virtual void setRow(
         const std::string_view& table, const std::string_view& key, storage::Entry entry)
     {
+        m_setTableRateCollector.update(1, true);
         SetRowResponse value;
 
         m_storage->asyncSetRow(table, key, std::move(entry),
@@ -163,6 +168,7 @@ public:
             BOOST_THROW_EXCEPTION(*(std::get<0>(ret)));
         }
 
+        m_createTableRateCollector.update(1, true);
         return std::get<1>(ret);
     }
 
@@ -175,6 +181,7 @@ public:
                 createPromise.set_value({std::move(error), std::move(table)});
             });
         auto value = createPromise.get_future().get();
+        m_createTableRateCollector.update(1, true);
         return value;
     }
 
@@ -185,7 +192,7 @@ public:
         {
             BOOST_THROW_EXCEPTION(*(std::get<0>(ret)));
         }
-
+        m_openTableRateCollector.update(1, true);
         return std::get<1>(ret);
     }
 
@@ -202,6 +209,7 @@ public:
             openPromise.set_value({std::move(error), std::move(table)});
         });
         auto value = openPromise.get_future().get();
+        m_openTableRateCollector.update(1, true);
         return value;
     }
 
@@ -216,5 +224,8 @@ private:
 
     EntryCachePtr m_codeCache;
     EntryCachePtr m_codeHashCache;
+
+    static bcos::RateCollector m_openTableRateCollector, m_createTableRateCollector,
+        m_getTableRateCollector, m_setTableRateCollector;
 };
 }  // namespace bcos::storage
