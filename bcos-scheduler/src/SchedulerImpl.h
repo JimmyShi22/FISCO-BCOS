@@ -57,7 +57,8 @@ public:
         m_isWasm(isWasm),
         m_isSerialExecute(isSerialExecute),
         m_schedulerTermId(schedulerTermId),
-        m_worker("scheduler", 8)
+        m_preExeWorker("schePreExe", 1),
+        m_exeWorker("scheExe", 1)
     {
         start();
     }
@@ -233,6 +234,7 @@ private:
 
     std::function<void(int64_t)> f_onNeedSwitchEvent;
 
-    bcos::ThreadPool m_worker;
+    bcos::ThreadPool m_preExeWorker;
+    bcos::ThreadPool m_exeWorker;
 };
 }  // namespace bcos::scheduler
