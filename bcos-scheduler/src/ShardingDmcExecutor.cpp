@@ -188,29 +188,37 @@ void ShardingDmcExecutor::preExecute()
                    << LOG_KV("timestamp", m_block->blockHeader()->timestamp());
 
 
-
     auto self = shared_from_this();
     m_executor->preExecuteTransactions(m_schedulerTermId, m_block->blockHeaderConst(),
         m_contractAddress, *message,
-        [this, message, preExecuteGuard, self](bcos::Error::UniquePtr error) {
-          m_preExePromise.set_value(std::move(error));
-        });
+        [this, message, preExecuteGuard, self](
+            bcos::Error::UniquePtr error) { m_preExePromise.set_value(std::move(error)); });
     auto future = m_preExePromise.get_future();
     auto status = future.wait_for(std::chrono::seconds(30));
-    if(status !=  std::future_status::ready) {
+    if (status != std::future_status::ready)
+    {
         std::string reason;
-        switch(status) {
-        case std::future_status::deferred: reason = "deferred\n"; break;
-        case std::future_status::timeout: reason = "timeout\n"; break;
-        case std::future_status::ready: reason = "ready!\n"; break;
+        switch (status)
+        {
+        case std::future_status::deferred:
+            reason = "deferred\n";
+            break;
+        case std::future_status::timeout:
+            reason = "timeout\n";
+            break;
+        case std::future_status::ready:
+            reason = "ready!\n";
+            break;
         }
         DMC_LOG(ERROR) << LOG_BADGE("BlockTrace") << LOG_BADGE("Sharding")
-                       << "send preExecute message error:"
-                       << LOG_KV("reason", reason) << LOG_KV("contract", m_contractAddress)
+                       << "send preExecute message error:" << LOG_KV("reason", reason)
+                       << LOG_KV("contract", m_contractAddress)
                        << LOG_KV("blockNumber", m_block->blockHeader()->number())
                        << LOG_KV("timestamp", m_block->blockHeader()->timestamp());
+        return;
     }
-    auto error =  m_preExePromise.get_future().get();
+
+    auto error = future.get();
     if (error)
     {
         m_preparedMessages = std::move(message);  // prepare failed, move back
