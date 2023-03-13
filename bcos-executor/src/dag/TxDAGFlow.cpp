@@ -23,14 +23,75 @@ using namespace bcos::executor;
 using namespace tbb::flow;
 
 
+int DagTxsTask::executeUnit()
+{
+    int exeCnt = 0;
+    ID id = m_dag.waitPop();
+    while (id != INVALID_ID)
+    {
+        do
+        {
+            exeCnt += 1;
+            f_executeTx(id);
+            id = m_dag.consume(id);
+        } while (id != INVALID_ID);
+        id = m_dag.waitPop();
+    }
+    if (exeCnt > 0)
+    {
+        Guard l(x_exeCnt);
+        m_exeCnt += exeCnt;
+    }
+    return exeCnt;
+}
+
+
 void DagTxsTask::run()
 {
+    auto threadNum = std::thread::hardware_concurrency();
     // TODO: add timeout logic
-    DAGFLOW_LOG(TRACE) << "Task run: DagTxsTask" << LOG_KV("size", m_tasks.size());
+    DAGFLOW_LOG(TRACE) << "Task run: DagTxsTask" << LOG_KV("size", m_totalParaTxs);
+    auto parallelTimeOut = utcSteadyTime() + 30000;  // 30 timeout
+
+    std::atomic<bool> isWarnedTimeout(false);
+    tbb::parallel_for(tbb::blocked_range<unsigned int>(0, threadNum),
+        [&](const tbb::blocked_range<unsigned int>& _r) {
+            (void)_r;
+
+            while (!hasFinished())
+            {
+                if (!isWarnedTimeout.load() && utcSteadyTime() >= parallelTimeOut)
+                {
+                    isWarnedTimeout.store(true);
+                    EXECUTOR_LOG(WARNING)
+                        << LOG_BADGE("executeBlock") << LOG_DESC("Para execute block timeout")
+                        << LOG_KV("txNum", m_totalParaTxs);
+                }
+                executeUnit();
+            }
+        });
+}
+void DagTxsTask::makeEdge(critical::ID from, critical::ID to)
+{
+    makeVertex(from);
+    makeVertex(to);
+    m_dag.addEdge(from, to);
+}
+void DagTxsTask::makeVertex(critical::ID id)
+{
+    m_dag.resize(id + 1);
+    m_totalParaTxs = std::max(m_totalParaTxs, id + 1);
+}
+
+
+void DagTxs2Task::run()
+{
+    // TODO: add timeout logic
+    DAGFLOW_LOG(TRACE) << "Task run: DagTxs2Task" << LOG_KV("size", m_tasks.size());
     m_startTask.try_put(continue_msg());
     m_dag.wait_for_all();
 }
-void DagTxsTask::makeEdge(critical::ID from, critical::ID to)
+void DagTxs2Task::makeEdge(critical::ID from, critical::ID to)
 {
     auto& fromTask =
         m_tasks.try_emplace(from, Task(m_dag, [this, from](Msg) { f_executeTx(from); }))
@@ -39,7 +100,7 @@ void DagTxsTask::makeEdge(critical::ID from, critical::ID to)
         m_tasks.try_emplace(to, Task(m_dag, [this, to](Msg) { f_executeTx(to); })).first->second;
     make_edge(fromTask, toTask);
 }
-void DagTxsTask::makeVertex(critical::ID id)
+void DagTxs2Task::makeVertex(critical::ID id)
 {
     auto& task =
         m_tasks.try_emplace(id, Task(m_dag, [this, id](Msg) { f_executeTx(id); })).first->second;
@@ -60,6 +121,10 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals)
         if (!currentTask || currentTask->type() != FlowTask::Type::DAG)
         {
             currentTask = std::make_shared<DagTxsTask>(executeTxHandler);
+            if (!m_tasks.empty())
+            {
+                m_tasks.back()->makeFinish();
+            }
             m_tasks.push_back(currentTask);
         }
 
@@ -74,6 +139,10 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals)
             if (!currentTask || currentTask->type() != FlowTask::Type::DAG)
             {
                 currentTask = std::make_shared<DagTxsTask>(executeTxHandler);
+                if (!m_tasks.empty())
+                {
+                    m_tasks.back()->makeFinish();
+                }
                 m_tasks.push_back(currentTask);
             }
 
@@ -84,6 +153,10 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals)
         {
             // only Normal Task
             currentTask = std::make_shared<NormalTxTask>(executeTxHandler, id);
+            if (!m_tasks.empty())
+            {
+                m_tasks.back()->makeFinish();
+            }
             m_tasks.push_back(currentTask);
         }
     };
@@ -92,6 +165,10 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals)
         if (!currentTask || currentTask->type() != FlowTask::Type::DAG)
         {
             currentTask = std::make_shared<DagTxsTask>(executeTxHandler);
+            if (!m_tasks.empty())
+            {
+                m_tasks.back()->makeFinish();
+            }
             m_tasks.push_back(currentTask);
         }
 
@@ -102,12 +179,21 @@ void TxDAGFlow::init(critical::CriticalFieldsInterface::Ptr _txsCriticals)
     auto onAllConflictHandler = [&](critical::ID id) {
         // only Normal Task
         currentTask = std::make_shared<NormalTxTask>(executeTxHandler, id);
+        if (!m_tasks.empty())
+        {
+            m_tasks.back()->makeFinish();
+        }
         m_tasks.push_back(currentTask);
     };
 
     // parse criticals
     _txsCriticals->traverseDag(onConflictHandler, onFirstConflictHandler, onEmptyConflictHandler,
         onAllConflictHandler, true);
+
+    if (!m_tasks.empty())
+    {
+        m_tasks.back()->makeFinish();
+    }
 
     DAGFLOW_LOG(TRACE) << LOG_DESC("End init TxDAGFlow");
 }

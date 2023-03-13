@@ -32,10 +32,20 @@ DAG::~DAG()
 void DAG::init(ID _maxSize)
 {
     clear();
-    for (ID i = 0; i < _maxSize; ++i)
-        m_vtxs.emplace_back(make_shared<Vertex>());
-    m_totalVtxs = _maxSize;
+    resize(_maxSize);
     m_totalConsume = 0;
+}
+
+void DAG::resize(ID _maxSize)
+{
+    if (m_vtxs.size() >= _maxSize)
+    {
+        return;
+    }
+
+    for (ID i = m_vtxs.size(); i < _maxSize; ++i)
+        m_vtxs.emplace_back(make_shared<Vertex>());
+    m_totalVtxs = m_vtxs.size();
 }
 
 void DAG::addEdge(ID _f, ID _t)

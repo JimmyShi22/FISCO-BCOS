@@ -22,6 +22,7 @@
 #include "./CriticalFields.h"
 #include "./TxDAGInterface.h"
 #include "tbb/flow_graph.h"
+#include <bcos-executor/src/dag/DAG.h>
 #include <vector>
 
 #define DAGFLOW_LOG(LEVEL) BCOS_LOG(LEVEL) << LOG_BADGE("EXECUTOR") << LOG_BADGE("DAGFlow")
@@ -46,6 +47,7 @@ public:
     virtual ~FlowTask() = default;
     virtual void run() = 0;
     virtual Type type() = 0;
+    virtual void makeFinish() = 0;
 
 protected:
     ExecuteTxFunc f_executeTx;
@@ -62,6 +64,7 @@ public:
         f_executeTx(m_id);
     };
     Type type() override { return Type::Normal; }
+    void makeFinish() override{};
 
 private:
     critical::ID m_id;
@@ -73,12 +76,39 @@ class DagTxsTask : public FlowTask
     using Msg = const tbb::flow::continue_msg&;
 
 public:
-    DagTxsTask(ExecuteTxFunc _f) : FlowTask(_f), m_startTask(m_dag) {}
+    DagTxsTask(ExecuteTxFunc _f) : FlowTask(_f), m_dag() { m_dag.init(0); }
     ~DagTxsTask() override = default;
     void run() override;
     Type type() override { return Type::DAG; }
     void makeEdge(critical::ID from, critical::ID to);
     void makeVertex(critical::ID id);
+    void makeFinish() override { m_dag.generate(); }
+
+private:
+    bool hasFinished() { return (m_exeCnt >= m_totalParaTxs) || (m_stop.load()); }
+    int executeUnit();
+    bcos::executor::DAG m_dag;
+
+    ID m_exeCnt = 0;
+    ID m_totalParaTxs = 0;
+
+    mutable std::mutex x_exeCnt;
+    std::atomic_bool m_stop = {false};
+};
+
+class DagTxs2Task : public FlowTask
+{
+    using Task = tbb::flow::continue_node<tbb::flow::continue_msg>;
+    using Msg = const tbb::flow::continue_msg&;
+
+public:
+    DagTxs2Task(ExecuteTxFunc _f) : FlowTask(_f), m_startTask(m_dag) {}
+    ~DagTxs2Task() override = default;
+    void run() override;
+    Type type() override { return Type::DAG; }
+    void makeEdge(critical::ID from, critical::ID to);
+    void makeVertex(critical::ID id);
+    void makeFinish() override{};
 
 private:
     tbb::flow::graph m_dag;
