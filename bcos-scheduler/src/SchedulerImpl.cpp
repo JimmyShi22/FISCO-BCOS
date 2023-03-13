@@ -144,7 +144,7 @@ void SchedulerImpl::handleBlockQueue(bcos::protocol::BlockNumber requestBlockNum
 void SchedulerImpl::executeBlock(bcos::protocol::Block::Ptr block, bool verify,
     std::function<void(bcos::Error::Ptr&&, bcos::protocol::BlockHeader::Ptr&&, bool)> _callback)
 {
-    m_worker.enqueue(
+    m_exeWorker.enqueue(
         [this, block = std::move(block), verify, callback = std::move(_callback)]() mutable {
             __itt_frame_begin_v3(ITT_DOMAIN_SCHEDULER_EXECUTE, nullptr);
             executeBlockInternal(std::move(block), verify,
@@ -883,7 +883,7 @@ void SchedulerImpl::preExecuteBlock(
 
         setPreparedBlock(blockNumber, timestamp, blockExecutive);
 
-        m_worker.enqueue([this, block, blockExecutive, callback = std::move(callback)]() {
+        m_preExeWorker.enqueue([this, block, blockExecutive, callback = std::move(callback)]() {
             try
             {
                 if (!m_isRunning)
@@ -1171,7 +1171,7 @@ void SchedulerImpl::tryExecuteBlock(
 {
     return;  // TODO: Fix blockHash bug here
 
-    m_worker.enqueue([this, number, &parentHash]() {
+    m_exeWorker.enqueue([this, number, &parentHash]() {
         if (!m_isRunning)
         {
             return;
