@@ -70,6 +70,8 @@ public:
     // Clear all data of this class (thread safe)
     void clear();
 
+    void resize(ID _maxSize);
+
 private:
     std::vector<std::shared_ptr<Vertex>> m_vtxs;
     tbb::concurrent_queue<ID> m_topLevel;
