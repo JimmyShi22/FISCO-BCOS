@@ -119,7 +119,12 @@ public:
     }
 
     size_t size() { return m_values.size(); }
-    bool contains(const KeyType& key) { return m_values.contains(key); }
+
+    bool contains(const KeyType& key)
+    {
+        bcos::ReadGuard guard(m_mutex);
+        return m_values.contains(key);
+    }
 
     // return true if need continue
     template <class AccessorType>  // handler return isContinue
@@ -185,8 +190,7 @@ public:
     ValueType remove(const KeyType& key)
     {
         auto idx = getBucketIndex(key);
-        auto bucket = m_buckets[idx];
-        return bucket->remove(key);
+        return m_buckets[idx]->remove(key);
     }
 
     size_t size() const
@@ -204,8 +208,7 @@ public:
     bool contains(const KeyType& key)
     {
         auto idx = getBucketIndex(key);
-        auto bucket = m_buckets[idx];
-        return bucket->contains(key);
+        return m_buckets[idx]->contains(key);
     }
 
     void clear()
