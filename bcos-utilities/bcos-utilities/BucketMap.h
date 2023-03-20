@@ -20,8 +20,11 @@
 #pragma once
 
 #include "Common.h"
+#include "Ranges.h"
 #include <map>
+#include <range/v3/view/group_by.hpp>
 #include <unordered_map>
+#include <vector>
 
 namespace bcos
 {
@@ -86,7 +89,12 @@ public:
     template <class AccessorType>
     bool find(typename AccessorType::Ptr& accessor, const KeyType& key)
     {
-        accessor = std::make_shared<AccessorType>(this->shared_from_this());  // acquire lock here
+        if (!accessor)
+        {
+            accessor =
+                std::make_shared<AccessorType>(this->shared_from_this());  // acquire lock here
+        }
+
         auto it = m_values.find(key);
         if (it == m_values.end())
         {
@@ -103,7 +111,11 @@ public:
     // return true if insert happen
     bool insert(typename WriteAccessor::Ptr& accessor, std::pair<KeyType, ValueType> kv)
     {
-        accessor = std::make_shared<WriteAccessor>(this->shared_from_this());  // acquire lock here
+        if (!accessor)
+        {
+            accessor =
+                std::make_shared<WriteAccessor>(this->shared_from_this());  // acquire lock here
+        }
         auto [it, inserted] = m_values.try_emplace(kv.first, kv.second);
         accessor->setValue(it);
         return inserted;
@@ -147,7 +159,12 @@ public:
 
     void clear(typename WriteAccessor::Ptr& accessor)
     {
-        accessor = std::make_shared<WriteAccessor>(this->shared_from_this());  // acquire lock here
+        if (!accessor)
+        {
+            accessor =
+                std::make_shared<WriteAccessor>(this->shared_from_this());  // acquire lock here
+        }
+
         m_values.clear();
     }
 
@@ -175,13 +192,34 @@ public:
     }
 
     virtual ~BucketMap(){};
-
     // return true if found
     template <class AccessorType>
     bool find(typename AccessorType::Ptr& accessor, const KeyType& key)
     {
         auto idx = getBucketIndex(key);
         return m_buckets[idx]->template find<AccessorType>(accessor, key);
+    }
+
+    // handler: accessor is nullptr if not found
+    template <class AccessorType>
+    void batchFind(const std::vector<KeyType>& keys,
+        std::function<void(const KeyType&, typename AccessorType::Ptr)> handler)
+    {
+        auto keyBatches =
+            keys | RANGES::views::chunk_by([this](const KeyType& a, const KeyType& b) {
+                return getBucketIndex(a) == getBucketIndex(b);
+            });
+
+        for (const auto& keyBatch : keyBatches)
+        {
+            typename AccessorType::Ptr accessor;
+            auto idx = getBucketIndex(*keyBatch.begin());
+            for (auto& key : keyBatch)
+            {
+                m_buckets[idx]->template find<AccessorType>(accessor, key);
+                handler(key, accessor);
+            }
+        }
     }
 
     bool insert(typename WriteAccessor::Ptr& accessor, std::pair<KeyType, ValueType> kv)

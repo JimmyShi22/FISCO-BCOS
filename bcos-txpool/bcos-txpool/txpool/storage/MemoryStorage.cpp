@@ -767,21 +767,31 @@ HashListPtr MemoryStorage::filterUnknownTxs(HashList const& _txsHashList, NodeID
         tx->appendKnownNode(_peer);
     }
     auto unknownTxsList = std::make_shared<HashList>();
-    for (auto const& txHash : _txsHashList)
-    {
-        if (m_txsTable.contains(txHash))
+    m_txsTable.batchFind<TxsMap::ReadAccessor>(_txsHashList,
+        [this, &unknownTxsList](auto const& txHash, TxsMap::ReadAccessor::Ptr accessor) {
+            if (!accessor && !m_missedTxs.contains(txHash))
+            {
+                unknownTxsList->push_back(txHash);
+                HashSet::WriteAccessor::Ptr accessor1;
+                m_missedTxs.insert(accessor1, txHash);
+            }
+        });
+    /*
+        for (auto const& txHash : _txsHashList)
         {
-            continue;
+            if (m_txsTable.contains(txHash))
+            {
+                continue;
+            }
+            if (m_missedTxs.contains(txHash))
+            {
+                continue;
+            }
+            unknownTxsList->push_back(txHash);
+            HashSet::WriteAccessor::Ptr accessor;
+            m_missedTxs.insert(accessor, txHash);
         }
-        if (m_missedTxs.contains(txHash))
-        {
-            continue;
-        }
-        unknownTxsList->push_back(txHash);
-        HashSet::WriteAccessor::Ptr accessor;
-        m_missedTxs.insert(accessor, txHash);
-    }
-
+    */
     if (m_missedTxs.size() >= m_config->poolLimit())
     {
         m_missedTxs.clear();
