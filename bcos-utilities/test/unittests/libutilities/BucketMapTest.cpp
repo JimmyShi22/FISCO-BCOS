@@ -166,6 +166,7 @@ BOOST_AUTO_TEST_CASE(batchFindTest)
         std::cout << accessor->key() << ":" << accessor->value() << std::endl;
         accessor->value()++;
         cnt++;
+        return true;
     });
     BOOST_CHECK_EQUAL(cnt, 100);
 
@@ -176,6 +177,7 @@ BOOST_AUTO_TEST_CASE(batchFindTest)
         BOOST_CHECK_EQUAL(accessor->value(), accessor->key() + 1);
         std::cout << accessor->key() << ":" << accessor->value() << std::endl;
         cnt++;
+        return true;
     });
     BOOST_CHECK_EQUAL(cnt, 100);
 }

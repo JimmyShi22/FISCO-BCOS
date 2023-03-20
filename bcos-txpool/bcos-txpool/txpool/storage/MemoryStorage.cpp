@@ -775,6 +775,7 @@ HashListPtr MemoryStorage::filterUnknownTxs(HashList const& _txsHashList, NodeID
                 HashSet::WriteAccessor::Ptr accessor1;
                 m_missedTxs.insert(accessor1, txHash);
             }
+            return true;
         });
     /*
         for (auto const& txHash : _txsHashList)
@@ -956,14 +957,30 @@ std::shared_ptr<HashList> MemoryStorage::batchVerifyProposal(Block::Ptr _block)
     auto startT = utcTime();
     auto lockT = utcTime() - startT;
     startT = utcTime();
-    for (size_t i = 0; i < txsSize; i++)
-    {
-        auto txHash = _block->transactionHash(i);
-        if (!m_txsTable.contains(txHash))
+
+    auto txHashes =
+        RANGES::iota_view<size_t, size_t>{0, txsSize} |
+        RANGES::views::transform([&_block](size_t i) { return _block->transactionHash(i); });
+
+    m_txsTable.batchFind<TxsMap::ReadAccessor>(
+        txHashes, [&missedTxs](const auto& txHash, TxsMap::ReadAccessor::Ptr accessor) {
+            if (!accessor)
+            {
+                missedTxs->emplace_back(txHash);
+            }
+            return true;
+        });
+
+    /*
+        for (size_t i = 0; i < txsSize; i++)
         {
-            missedTxs->emplace_back(txHash);
+            auto txHash = _block->transactionHash(i);
+            if (!m_txsTable.contains(txHash))
+            {
+                missedTxs->emplace_back(txHash);
+            }
         }
-    }
+        */
     TXPOOL_LOG(INFO) << LOG_DESC("batchVerifyProposal") << LOG_KV("consNum", batchId)
                      << LOG_KV("hash", batchHash.abridged()) << LOG_KV("txsSize", txsSize)
                      << LOG_KV("lockT", lockT) << LOG_KV("verifyT", (utcTime() - startT));
@@ -972,8 +989,14 @@ std::shared_ptr<HashList> MemoryStorage::batchVerifyProposal(Block::Ptr _block)
 
 bool MemoryStorage::batchVerifyProposal(std::shared_ptr<HashList> _txsHashList)
 {
-    return RANGES::all_of(_txsHashList->begin(), _txsHashList->end(),
-        [&](auto&& txHash) { return m_txsTable.contains(txHash); });
+    bool has = true;
+    m_txsTable.batchFind<TxsMap::ReadAccessor>(
+        *_txsHashList, [&has](auto const& txHash, TxsMap::ReadAccessor::Ptr accessor) {
+            has = (accessor != nullptr);
+            return has;  // break if has is false
+        });
+
+    return has;
 }
 
 HashListPtr MemoryStorage::getTxsHash(int _limit)

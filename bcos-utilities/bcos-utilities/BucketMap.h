@@ -200,10 +200,10 @@ public:
         return m_buckets[idx]->template find<AccessorType>(accessor, key);
     }
 
-    // handler: accessor is nullptr if not found
+    // handler: accessor is nullptr if not found, handler return false to break to find
     template <class AccessorType>
-    void batchFind(const std::vector<KeyType>& keys,
-        std::function<void(const KeyType&, typename AccessorType::Ptr)> handler)
+    void batchFind(
+        const auto& keys, std::function<bool(const KeyType&, typename AccessorType::Ptr)> handler)
     {
         auto keyBatches =
             keys | RANGES::views::chunk_by([this](const KeyType& a, const KeyType& b) {
@@ -214,13 +214,17 @@ public:
         {
             typename AccessorType::Ptr accessor;
             auto idx = getBucketIndex(*keyBatch.begin());
-            for (auto& key : keyBatch)
+            for (const auto& key : keyBatch)
             {
                 m_buckets[idx]->template find<AccessorType>(accessor, key);
-                handler(key, accessor);
+                if (!handler(key, accessor))
+                {
+                    break;
+                }
             }
         }
     }
+
 
     bool insert(typename WriteAccessor::Ptr& accessor, std::pair<KeyType, ValueType> kv)
     {
