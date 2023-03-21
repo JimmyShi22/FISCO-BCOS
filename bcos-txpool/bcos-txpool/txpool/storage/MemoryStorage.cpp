@@ -778,16 +778,6 @@ HashListPtr MemoryStorage::filterUnknownTxs(HashList const& _txsHashList, NodeID
         }
     });
 
-    for (const auto& missHash : *missList)
-    {
-        HashSet::WriteAccessor::Ptr accessor1;
-        bool success = m_missedTxs.insert(accessor1, missHash);
-        if (success)
-        {
-            unknownTxsList->push_back(missHash);
-        }
-    }
-
     if (m_missedTxs.size() >= m_config->poolLimit())
     {
         m_missedTxs.clear();
