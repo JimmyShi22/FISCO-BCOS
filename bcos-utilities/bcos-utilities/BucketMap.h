@@ -137,6 +137,30 @@ public:
         return ret;
     }
 
+
+    // return true if remove success
+    bool remove(typename WriteAccessor::Ptr& accessor, const KeyType& key)
+    {
+        if (!accessor)
+        {
+            accessor =
+                std::make_shared<WriteAccessor>(this->shared_from_this());  // acquire lock here
+        }
+
+        auto it = m_values.find(key);
+        if (it == m_values.end())
+        {
+            accessor->setValue(m_values.end());
+            return false;
+        }
+        else
+        {
+            accessor->setValue(it);
+            m_values.erase(it);
+            return true;
+        }
+    }
+
     size_t size() { return m_values.size(); }
     bool contains(const KeyType& key)
     {
@@ -248,6 +272,35 @@ public:
                 onInsert(success, kv.first, success ? accessor : nullptr);
             }
         }
+    }
+
+    void batchInsert(const auto& kvs)
+    {
+        batchInsert(kvs, [](bool, const KeyType&, typename WriteAccessor::Ptr) {});
+    }
+
+    void batchRemove(const auto& keys,
+        std::function<void(bool, const KeyType&, typename WriteAccessor::Ptr)> onRemove)
+    {
+        auto keyBatches =
+            keys | RANGES::views::chunk_by([this](const KeyType& a, const KeyType& b) {
+                return getBucketIndex(a) == getBucketIndex(b);
+            });
+        for (const auto& keyBatch : keyBatches)
+        {
+            typename WriteAccessor::Ptr accessor;
+            auto idx = getBucketIndex(*keyBatch.begin());
+            for (const auto& key : keyBatch)
+            {
+                bool success = m_buckets[idx]->remove(accessor, key);
+                onRemove(success, key, success ? accessor : nullptr);
+            }
+        }
+    }
+
+    void batchRemove(const auto& keys)
+    {
+        batchRemove(keys, [](bool, const KeyType&, typename WriteAccessor::Ptr) {});
     }
 
     bool insert(typename WriteAccessor::Ptr& accessor, std::pair<KeyType, ValueType> kv)
@@ -363,6 +416,11 @@ public:
                 onInsert(success, key, success ? accessor : nullptr);
             }
         }
+    }
+
+    void batchInsert(const auto& keys)
+    {
+        batchInsert(keys, [](bool, const KeyType&, typename BucketSet::WriteAccessor::Ptr) {});
     }
 };
 
