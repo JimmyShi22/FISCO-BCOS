@@ -56,10 +56,7 @@ void TxPoolNonceChecker::insert(NonceType const& _nonce)
 
 void TxPoolNonceChecker::batchInsert(BlockNumber /*_batchId*/, NonceListPtr const& _nonceList)
 {
-    for (auto const& nonce : *_nonceList)
-    {
-        insert(nonce);
-    }
+    m_nonces.batchInsert(*_nonceList);
 }
 
 void TxPoolNonceChecker::remove(NonceType const& _nonce)
@@ -69,17 +66,11 @@ void TxPoolNonceChecker::remove(NonceType const& _nonce)
 
 void TxPoolNonceChecker::batchRemove(NonceList const& _nonceList)
 {
-    for (auto const& nonce : _nonceList)
-    {
-        remove(nonce);
-    }
+    m_nonces.batchRemove(_nonceList);
 }
 
 void TxPoolNonceChecker::batchRemove(tbb::concurrent_unordered_set<bcos::protocol::NonceType,
     std::hash<bcos::protocol::NonceType>> const& _nonceList)
 {
-    for (auto const& nonce : _nonceList)
-    {
-        remove(nonce);
-    }
+    m_nonces.batchRemove(_nonceList);
 }
