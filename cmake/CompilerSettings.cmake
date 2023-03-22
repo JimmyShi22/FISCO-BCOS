@@ -116,6 +116,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU") OR("${CMAKE_CXX_COMPILER_ID}" MATC
 
         add_compile_options(-fPIC)
         add_compile_options(-Wno-error=restrict)
+        add_compile_options(-Wno-unknown-pragmas)
         add_compile_options(-Wno-restrict)
         add_compile_options(-Wno-error=stringop-overflow)
     elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
