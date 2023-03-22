@@ -112,6 +112,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU") OR("${CMAKE_CXX_COMPILER_ID}" MATC
             add_compile_options(-Wno-maybe-uninitialized)
             add_compile_options(-Wno-error=array-bounds)
             add_compile_options(-Wno-error=aggressive-loop-optimizations)
+            add_compile_options(-Wno-error=missing-requires)
         endif()
 
         add_compile_options(-fPIC)
