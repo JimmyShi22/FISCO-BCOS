@@ -92,8 +92,7 @@ CallParameters::UniquePtr CoroutineTransactionExecutive::externalCall(
         output->evmStatus = EVMC_REVERT;
     }
 
-    if (versionCompareTo(
-            m_blockContext.blockVersion(), protocol::BlockVersion::V3_3_VERSION) >= 0)
+    if (versionCompareTo(m_blockContext.blockVersion(), protocol::BlockVersion::V3_3_VERSION) >= 0)
     {
         if (output->type == CallParameters::REVERT)
         {
