@@ -253,7 +253,6 @@ std::string ShardingBlockExecutive::getContractShard(const std::string& contract
 
     if (shard == m_contract2ShardCache->end())
     {
-        WriteGuard l(x_contract2Shard);
         shard = m_contract2ShardCache->find(contractAddress);
         if (shard == m_contract2ShardCache->end())
         {

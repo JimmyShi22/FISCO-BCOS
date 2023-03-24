@@ -36,7 +36,8 @@ public:
         bcos::protocol::TransactionSubmitResultFactory::Ptr transactionSubmitResultFactory,
         bool staticCall, bcos::protocol::BlockFactory::Ptr _blockFactory,
         bcos::txpool::TxPoolInterface::Ptr _txPool,
-        std::shared_ptr<tbb::concurrent_unordered_map<std::string, std::string>> _contract2ShardCache)
+        std::shared_ptr<tbb::concurrent_unordered_map<std::string, std::string>>
+            _contract2ShardCache)
       : BlockExecutive(block, scheduler, startContextID, transactionSubmitResultFactory, staticCall,
             _blockFactory, _txPool),
         m_contract2ShardCache(_contract2ShardCache){};
@@ -46,7 +47,8 @@ public:
         bcos::protocol::TransactionSubmitResultFactory::Ptr transactionSubmitResultFactory,
         bool staticCall, bcos::protocol::BlockFactory::Ptr _blockFactory,
         bcos::txpool::TxPoolInterface::Ptr _txPool,
-        std::shared_ptr<tbb::concurrent_unordered_map<std::string, std::string>> _contract2ShardCache,
+        std::shared_ptr<tbb::concurrent_unordered_map<std::string, std::string>>
+            _contract2ShardCache,
         uint64_t _gasLimit, bool _syncBlock)
       : BlockExecutive(block, scheduler, startContextID, transactionSubmitResultFactory, staticCall,
             _blockFactory, _txPool, _gasLimit, _syncBlock),
@@ -70,8 +72,6 @@ private:
     bool needPrepareExecutor() override { return false; }
 
     std::string getContractShard(const std::string& contractAddress);
-
-    mutable bcos::SharedMutex x_contract2Shard;
 
     std::optional<bcos::storage::StorageWrapper> m_storageWrapper;
     // tbb::concurrent_unordered_map<std::string, std::string> m_contract2Shard;
