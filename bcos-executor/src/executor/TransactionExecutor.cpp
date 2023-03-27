@@ -2445,6 +2445,7 @@ std::unique_ptr<protocol::ExecutionMessage> TransactionExecutor::toExecutionResu
     message->setDelegateCallAddress(std::move(params->codeAddress));
     message->setDelegateCallCode(std::move(params->delegateCallCode));
     message->setDelegateCallSender(std::move(params->delegateCallSender));
+    message->setHasContractTableChanged(params->hasContractTableChanged);
 
     return message;
 }
