@@ -719,8 +719,8 @@ void MemoryStorage::removeInvalidTxs(bool lock)
                                                            // so we estimate for 2x larger vector
                                                            // to reserve
 
-        m_invalidTxs.clear([&](bool success, const bcos::crypto::HashType& key,
-                               TxsMap::WriteAccessor::Ptr accessor) {
+        m_invalidTxs.clear([&](bool success, const bcos::crypto::HashType& txHash,
+                               const bcos::protocol::Transaction::Ptr& tx) {
             if (!success)
             {
                 return;
@@ -728,21 +728,18 @@ void MemoryStorage::removeInvalidTxs(bool lock)
 
             txCnt++;
 
-            auto& tx = accessor->value();
-            auto const& txHash = accessor->key();
             auto const& nonce = tx->nonce();
             auto txResult = m_config->txResultFactory()->createTxSubmitResult();
             txResult->setTxHash(txHash);
             txResult->setStatus(static_cast<uint32_t>(TransactionStatus::TransactionPoolTimeout));
             removeSubmittedTxWithoutLock(std::move(txResult), true);
-
-            invalidNonceList.emplace_back(nonce);
+            m_config->txPoolNonceChecker()->remove(nonce);
+            // invalidNonceList.emplace_back(nonce);
         });
 
         notifyUnsealedTxsSize();
         m_config->txPoolNonceChecker()->batchRemove(invalidNonceList);
         TXPOOL_LOG(DEBUG) << LOG_DESC("removeInvalidTxs") << LOG_KV("size", txCnt);
-        m_invalidTxs.clear();
     }
     catch (std::exception const& e)
     {
