@@ -733,8 +733,7 @@ void MemoryStorage::removeInvalidTxs(bool lock)
             txResult->setTxHash(txHash);
             txResult->setStatus(static_cast<uint32_t>(TransactionStatus::TransactionPoolTimeout));
             removeSubmittedTxWithoutLock(std::move(txResult), true);
-            m_config->txPoolNonceChecker()->remove(nonce);
-            // invalidNonceList.emplace_back(nonce);
+            invalidNonceList.emplace_back(nonce);
         });
 
         notifyUnsealedTxsSize();
