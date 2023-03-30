@@ -46,7 +46,9 @@ public:
         m_precompiled(std::move(precompiled)),
         m_staticPrecompiled(std::move(staticPrecompiled)),
         m_blockContext(blockContext),
-        m_gasInjector(gasInjector)
+        m_gasInjector(gasInjector),
+        m_pool(std::make_shared<bcos::ThreadPool>("executive", 128))
+
     {}
 
     virtual ~ExecutiveFactory() = default;
@@ -66,6 +68,7 @@ protected:
     std::shared_ptr<const std::set<std::string>> m_staticPrecompiled;
     const BlockContext& m_blockContext;
     const wasm::GasInjector& m_gasInjector;
+    bcos::ThreadPool::Ptr m_pool;
 };
 
 class ShardingExecutiveFactory : public ExecutiveFactory

@@ -11,14 +11,14 @@ using namespace bcos::storage;
 
 ShardingTransactionExecutive::ShardingTransactionExecutive(const BlockContext& blockContext,
     std::string contractAddress, int64_t contextID, int64_t seq,
-    const wasm::GasInjector& gasInjector)
-  : CoroutineTransactionExecutive(
-        std::move(blockContext), std::move(contractAddress), contextID, seq, gasInjector)
+    const wasm::GasInjector& gasInjector, ThreadPool::Ptr pool)
+  : PromiseTransactionExecutive(
+        pool, std::move(blockContext), std::move(contractAddress), contextID, seq, gasInjector)
 {}
 
 CallParameters::UniquePtr ShardingTransactionExecutive::start(CallParameters::UniquePtr input)
 {
-    auto ret = CoroutineTransactionExecutive::start(std::move(input));
+    auto ret = PromiseTransactionExecutive::start(std::move(input));
     ret->contextID = contextID();
     ret->seq = seq();
     return ret;
@@ -56,7 +56,7 @@ CallParameters::UniquePtr ShardingTransactionExecutive::externalCall(
                                  << "ShardingTransactionExecutive call other shard: "
                                  << LOG_KV("toShard", toShardName)
                                  << LOG_KV("input", input->toFullString());
-            return CoroutineTransactionExecutive::externalCall(std::move(input));
+            return PromiseTransactionExecutive::externalCall(std::move(input));
         }
     }
 
