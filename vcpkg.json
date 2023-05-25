@@ -154,6 +154,10 @@
     {
       "name": "boost-context",
       "version": "1.79.0-m1"
+    },
+    {
+      "name": "boost-asio",
+      "version": "1.79.0"
     }
   ]
 }
