@@ -280,7 +280,7 @@ public:
     bool find(typename AccessorType::Ptr& accessor, const KeyType& key)
     {
         auto idx = getBucketIndex(key);
-        auto bucket = m_buckets[idx];
+        typename Bucket<KeyType, ValueType>::Ptr bucket = m_buckets[idx];
         return bucket->template find<AccessorType>(accessor, key);
     }
 
@@ -333,14 +333,14 @@ public:
     bool insert(typename WriteAccessor::Ptr& accessor, std::pair<KeyType, ValueType> kv)
     {
         auto idx = getBucketIndex(kv.first);
-        auto bucket = m_buckets[idx];
+        typename Bucket<KeyType, ValueType>::Ptr bucket = m_buckets[idx];
         return bucket->insert(accessor, std::move(kv));
     }
 
     ValueType remove(const KeyType& key)
     {
         auto idx = getBucketIndex(key);
-        auto bucket = m_buckets[idx];
+        typename Bucket<KeyType, ValueType>::Ptr bucket = m_buckets[idx];
         return bucket->remove(key);
     }
 
@@ -359,7 +359,7 @@ public:
     bool contains(const KeyType& key)
     {
         auto idx = getBucketIndex(key);
-        auto bucket = m_buckets[idx];
+        typename Bucket<KeyType, ValueType>::Ptr bucket = m_buckets[idx];
         return bucket->contains(key);
     }
 
@@ -378,7 +378,7 @@ public:
             std::queue<std::pair<size_t, typename Bucket<KeyType, ValueType>::Ptr>> bucket2Remove;
             for (size_t i = 0; i < m_buckets.size(); i++)
             {
-                auto bucket = m_buckets[i];
+                typename Bucket<KeyType, ValueType>::Ptr bucket = m_buckets[i];
                 m_buckets[i] = std::make_shared<Bucket<KeyType, ValueType>>();
                 bucket2Remove.emplace(i, std::move(bucket));
             }
@@ -494,7 +494,7 @@ public:
         {
             typename AccessorType::Ptr accessor;
             size_t idx = getBucketIndex(batch.front());
-            auto bucket = m_buckets[idx];
+            typename Bucket<KeyType, ValueType>::Ptr bucket = m_buckets[idx];
             bool acquired = bucket->acquireAccessor(accessor, false);
 
             if (acquired) [[likely]]
