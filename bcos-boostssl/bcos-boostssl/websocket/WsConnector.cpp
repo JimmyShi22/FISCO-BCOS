@@ -101,8 +101,7 @@ void WsConnector::connectToWsServer(const std::string& _host, uint16_t _port, bo
                         << LOG_BADGE("connectToWsServer") << LOG_DESC("async_connect success")
                         << LOG_KV("endpoint", endpoint);
 
-                    auto wsStreamDelegate =
-                        builder->build(_disableSsl, ctx, rawStream);
+                    auto wsStreamDelegate = builder->build(_disableSsl, ctx, rawStream);
 
                     std::shared_ptr<std::string> nodeId = std::make_shared<std::string>();
                     wsStreamDelegate->setVerifyCallback(
@@ -135,7 +134,7 @@ void WsConnector::connectToWsServer(const std::string& _host, uint16_t _port, bo
 
                         // websocket async handshake
                         wsStreamDelegate->asyncWsHandshake(tmpHost, "/",
-                            [this, connector, _host, _port, endpoint, _callback, wsStreamDelegate,
+                            [connector, _host, _port, endpoint, _callback, wsStreamDelegate,
                                 nodeId](boost::beast::error_code _ec) mutable {
                                 if (_ec)
                                 {
