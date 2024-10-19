@@ -84,7 +84,7 @@ void WsConnector::connectToWsServer(const std::string& _host, uint16_t _port, bo
 
             // async connect
             rawStream->async_connect(_results,
-                [this, _host, _port, _disableSsl, endpoint, ctx, connector, builder, rawStream,
+                [_host, _port, _disableSsl, endpoint, ctx, connector, builder, rawStream,
                     _callback](boost::beast::error_code _ec,
                     boost::asio::ip::tcp::resolver::results_type::endpoint_type _ep) mutable {
                     if (_ec)
@@ -108,8 +108,8 @@ void WsConnector::connectToWsServer(const std::string& _host, uint16_t _port, bo
                         _disableSsl, NodeInfoTools::newVerifyCallback(nodeId));
 
                     // start ssl handshake
-                    wsStreamDelegate->asyncHandshake([this, wsStreamDelegate, connector, _host,
-                                                         _port, endpoint, _ep, _callback,
+                    wsStreamDelegate->asyncHandshake([wsStreamDelegate, connector, _host, _port,
+                                                         endpoint, _ep, _callback,
                                                          nodeId](boost::beast::error_code _ec) {
                         if (_ec)
                         {
